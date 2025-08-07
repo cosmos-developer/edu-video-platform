@@ -1,0 +1,390 @@
+import { Router } from 'express'
+import { body, param, query } from 'express-validator'
+import { validationResult } from 'express-validator'
+import { authenticate } from '../middleware/auth/authMiddleware'
+import { VideoSessionService } from '../services/VideoSessionService'
+import { AuthenticatedRequest } from '../middleware/auth/authMiddleware'
+
+const router = Router()
+
+// Apply authentication middleware to all routes
+router.use(authenticate)
+
+// POST /api/sessions/start - Start or resume video session
+router.post('/start',
+  body('videoId').isUUID().withMessage('Valid video ID is required'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const session = await VideoSessionService.startSession(
+        req.body.videoId,
+        req.user!.id
+      )
+
+      res.json({
+        success: true,
+        data: session,
+        message: 'Video session started'
+      })
+
+    } catch (error: any) {
+      console.error('Error starting session:', error)
+      
+      if (error.message === 'Video not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Video not found'
+        })
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to start video session'
+      })
+    }
+  }
+)
+
+// PUT /api/sessions/:sessionId/progress - Update session progress
+router.put('/:sessionId/progress',
+  param('sessionId').isUUID().withMessage('Invalid session ID'),
+  body('currentTime').isInt({ min: 0 }).withMessage('Current time must be a positive integer'),
+  body('totalWatchTime').optional().isInt({ min: 0 }).withMessage('Total watch time must be a positive integer'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const progressData = {
+        currentTime: req.body.currentTime,
+        totalWatchTime: req.body.totalWatchTime
+      }
+
+      const session = await VideoSessionService.updateProgress(
+        req.params.sessionId,
+        progressData,
+        req.user!.id
+      )
+
+      res.json({
+        success: true,
+        data: session,
+        message: 'Progress updated'
+      })
+
+    } catch (error: any) {
+      console.error('Error updating progress:', error)
+      
+      if (error.message === 'Session not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found'
+        })
+      }
+
+      if (error.message === 'Access denied') {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        })
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update progress'
+      })
+    }
+  }
+)
+
+// POST /api/sessions/:sessionId/milestone - Mark milestone as reached
+router.post('/:sessionId/milestone',
+  param('sessionId').isUUID().withMessage('Invalid session ID'),
+  body('milestoneId').isUUID().withMessage('Valid milestone ID is required'),
+  body('timestamp').isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const result = await VideoSessionService.markMilestoneReached(
+        req.params.sessionId,
+        req.body.milestoneId,
+        req.body.timestamp,
+        req.user!.id
+      )
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Milestone marked as reached'
+      })
+
+    } catch (error: any) {
+      console.error('Error marking milestone:', error)
+      
+      if (error.message === 'Session not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found'
+        })
+      }
+
+      if (error.message === 'Milestone not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Milestone not found'
+        })
+      }
+
+      if (error.message === 'Access denied') {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        })
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to mark milestone'
+      })
+    }
+  }
+)
+
+// POST /api/sessions/:sessionId/question - Submit question answer
+router.post('/:sessionId/question',
+  param('sessionId').isUUID().withMessage('Invalid session ID'),
+  body('questionId').isUUID().withMessage('Valid question ID is required'),
+  body('answer').notEmpty().trim().withMessage('Answer is required'),
+  body('milestoneId').isUUID().withMessage('Valid milestone ID is required'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const answerData = {
+        questionId: req.body.questionId,
+        answer: req.body.answer,
+        milestoneId: req.body.milestoneId
+      }
+
+      const result = await VideoSessionService.submitAnswer(
+        req.params.sessionId,
+        answerData,
+        req.user!.id
+      )
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Answer submitted successfully'
+      })
+
+    } catch (error: any) {
+      console.error('Error submitting answer:', error)
+      
+      if (error.message === 'Session not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found'
+        })
+      }
+
+      if (error.message === 'Question not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Question not found'
+        })
+      }
+
+      if (error.message === 'Access denied') {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        })
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to submit answer'
+      })
+    }
+  }
+)
+
+// PUT /api/sessions/:sessionId/complete - Mark session as completed
+router.put('/:sessionId/complete',
+  param('sessionId').isUUID().withMessage('Invalid session ID'),
+  body('finalTime').isInt({ min: 0 }).withMessage('Final time must be a positive integer'),
+  body('totalWatchTime').isInt({ min: 0 }).withMessage('Total watch time must be a positive integer'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const completionData = {
+        finalTime: req.body.finalTime,
+        totalWatchTime: req.body.totalWatchTime
+      }
+
+      const session = await VideoSessionService.completeSession(
+        req.params.sessionId,
+        completionData,
+        req.user!.id
+      )
+
+      res.json({
+        success: true,
+        data: session,
+        message: 'Session completed successfully'
+      })
+
+    } catch (error: any) {
+      console.error('Error completing session:', error)
+      
+      if (error.message === 'Session not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found'
+        })
+      }
+
+      if (error.message === 'Access denied') {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        })
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to complete session'
+      })
+    }
+  }
+)
+
+// GET /api/sessions/video/:videoId - Get user's session for a specific video
+router.get('/video/:videoId',
+  param('videoId').isUUID().withMessage('Invalid video ID'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const session = await VideoSessionService.getSessionByVideo(
+        req.params.videoId,
+        req.user!.id
+      )
+
+      res.json({
+        success: true,
+        data: session
+      })
+
+    } catch (error: any) {
+      console.error('Error fetching session:', error)
+      
+      if (error.message === 'Video not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Video not found'
+        })
+      }
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch session'
+      })
+    }
+  }
+)
+
+// GET /api/sessions/user - Get user's video sessions (paginated)
+router.get('/user',
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('status').optional().isIn(['IN_PROGRESS', 'COMPLETED', 'PAUSED']).withMessage('Invalid status'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const page = parseInt(req.query.page as string) || 1
+      const limit = parseInt(req.query.limit as string) || 10
+      const status = req.query.status as string
+
+      const result = await VideoSessionService.getUserSessions({
+        userId: req.user!.id,
+        page,
+        limit,
+        status
+      })
+
+      res.json({
+        success: true,
+        data: result.sessions,
+        meta: {
+          total: result.total,
+          page,
+          limit,
+          totalPages: Math.ceil(result.total / limit)
+        }
+      })
+
+    } catch (error) {
+      console.error('Error fetching user sessions:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch sessions'
+      })
+    }
+  }
+)
+
+export default router

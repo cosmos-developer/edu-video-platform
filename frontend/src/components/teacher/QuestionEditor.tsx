@@ -1,0 +1,401 @@
+import React, { useState } from 'react'
+import { milestoneService } from '../../services/video'
+import type { Milestone, Question } from '../../services/video'
+
+interface QuestionEditorProps {
+  milestone: Milestone
+  onClose: () => void
+}
+
+export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
+  const [questions, setQuestions] = useState<Question[]>(milestone.questions || [])
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [formData, setFormData] = useState({
+    type: 'MULTIPLE_CHOICE' as 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER',
+    question: '',
+    explanation: '',
+    correctAnswer: '',
+    options: ['', '', '', ''] // For multiple choice
+  })
+
+  const resetForm = () => {
+    setFormData({
+      type: 'MULTIPLE_CHOICE',
+      question: '',
+      explanation: '',
+      correctAnswer: '',
+      options: ['', '', '', '']
+    })
+    setShowAddForm(false)
+    setError(null)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleOptionChange = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      options: prev.options.map((option, i) => i === index ? value : option)
+    }))
+  }
+
+  const handleCorrectOptionChange = (optionText: string) => {
+    setFormData(prev => ({
+      ...prev,
+      correctAnswer: optionText
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.question.trim()) {
+      setError('Question text is required')
+      return
+    }
+
+    if (!formData.correctAnswer.trim()) {
+      setError('Correct answer is required')
+      return
+    }
+
+    // Validate multiple choice
+    if (formData.type === 'MULTIPLE_CHOICE') {
+      const validOptions = formData.options.filter(opt => opt.trim())
+      if (validOptions.length < 2) {
+        setError('At least 2 options are required for multiple choice questions')
+        return
+      }
+      if (!validOptions.includes(formData.correctAnswer)) {
+        setError('Correct answer must match one of the options')
+        return
+      }
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response = await milestoneService.addQuestion(milestone.id, {
+        type: formData.type,
+        question: formData.question,
+        explanation: formData.explanation || undefined,
+        correctAnswer: formData.correctAnswer,
+        options: formData.type === 'MULTIPLE_CHOICE' 
+          ? formData.options.filter(opt => opt.trim())
+          : []
+      })
+
+      setQuestions(prev => [...prev, response])
+      resetForm()
+    } catch (err: any) {
+      console.error('Error adding question:', err)
+      setError(err.message || 'Failed to add question')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Manage Questions</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Milestone: {milestone.title} 
+                <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                  milestone.type === 'QUIZ' 
+                    ? 'bg-red-100 text-red-700'
+                    : milestone.type === 'CHECKPOINT'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {milestone.type}
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Existing Questions */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Questions ({questions.length})
+                </h3>
+                {!showAddForm && (
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="btn-primary"
+                  >
+                    Add Question
+                  </button>
+                )}
+              </div>
+
+              {questions.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                  <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-gray-500 mb-4">No questions added yet</p>
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="btn-primary"
+                  >
+                    Add First Question
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {questions.map((question, index) => (
+                    <div key={question.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900">Q{index + 1}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            question.type === 'MULTIPLE_CHOICE' 
+                              ? 'bg-blue-100 text-blue-700'
+                              : question.type === 'TRUE_FALSE'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {question.type.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <h4 className="font-medium text-gray-900 mb-2">
+                        {question.question}
+                      </h4>
+                      
+                      {question.type === 'MULTIPLE_CHOICE' && question.options && (
+                        <div className="space-y-1 mb-2">
+                          {question.options.map((option, _optIndex) => (
+                            <div key={option.id} className="flex items-center text-sm">
+                              <div className={`w-2 h-2 rounded-full mr-2 ${
+                                option.isCorrect ? 'bg-green-500' : 'bg-gray-300'
+                              }`}></div>
+                              <span className={option.isCorrect ? 'font-medium text-green-700' : 'text-gray-600'}>
+                                {option.text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {question.type !== 'MULTIPLE_CHOICE' && (
+                        <div className="text-sm text-green-700 font-medium mb-2">
+                          Correct: {question.correctAnswer}
+                        </div>
+                      )}
+                      
+                      {question.explanation && (
+                        <p className="text-sm text-gray-600 italic">
+                          Explanation: {question.explanation}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Question Form */}
+            <div>
+              {showAddForm && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Add New Question</h3>
+                    <button
+                      onClick={resetForm}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+                      <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Question Type */}
+                    <div>
+                      <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                        Question Type
+                      </label>
+                      <select
+                        id="type"
+                        name="type"
+                        value={formData.type}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                        <option value="TRUE_FALSE">True/False</option>
+                        <option value="SHORT_ANSWER">Short Answer</option>
+                      </select>
+                    </div>
+
+                    {/* Question Text */}
+                    <div>
+                      <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-1">
+                        Question *
+                      </label>
+                      <textarea
+                        id="question"
+                        name="question"
+                        value={formData.question}
+                        onChange={handleInputChange}
+                        placeholder="Enter your question here"
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+
+                    {/* Options for Multiple Choice */}
+                    {formData.type === 'MULTIPLE_CHOICE' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Answer Options *
+                        </label>
+                        <div className="space-y-2">
+                          {formData.options.map((option, index) => (
+                            <div key={index} className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                name="correctAnswer"
+                                value={option}
+                                checked={formData.correctAnswer === option && option.trim() !== ''}
+                                onChange={(e) => handleCorrectOptionChange(e.target.value)}
+                                className="text-blue-600"
+                                disabled={!option.trim()}
+                              />
+                              <input
+                                type="text"
+                                value={option}
+                                onChange={(e) => handleOptionChange(index, e.target.value)}
+                                placeholder={`Option ${index + 1}`}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Select the radio button for the correct answer
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Correct Answer for True/False and Short Answer */}
+                    {formData.type !== 'MULTIPLE_CHOICE' && (
+                      <div>
+                        <label htmlFor="correctAnswer" className="block text-sm font-medium text-gray-700 mb-1">
+                          Correct Answer *
+                        </label>
+                        {formData.type === 'TRUE_FALSE' ? (
+                          <select
+                            id="correctAnswer"
+                            name="correctAnswer"
+                            value={formData.correctAnswer}
+                            onChange={handleInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          >
+                            <option value="">Select correct answer</option>
+                            <option value="True">True</option>
+                            <option value="False">False</option>
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            id="correctAnswer"
+                            name="correctAnswer"
+                            value={formData.correctAnswer}
+                            onChange={handleInputChange}
+                            placeholder="Enter the correct answer"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Explanation */}
+                    <div>
+                      <label htmlFor="explanation" className="block text-sm font-medium text-gray-700 mb-1">
+                        Explanation (Optional)
+                      </label>
+                      <textarea
+                        id="explanation"
+                        name="explanation"
+                        value={formData.explanation}
+                        onChange={handleInputChange}
+                        placeholder="Explain why this is the correct answer"
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        className="btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className={`btn-primary ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {loading ? 'Adding...' : 'Add Question'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,682 @@
+// Interactive Learning Platform Database Schema
+// Prisma Schema for PostgreSQL
+// Designed for multi-tenant video-based learning with AI-generated questions
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// CORE USER MANAGEMENT & AUTHENTICATION
+// ========================================
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  username  String?    @unique
+  firstName String
+  lastName  String
+  avatar    String?    // URL to profile image
+  role      UserRole   @default(STUDENT)
+  status    UserStatus @default(PENDING_VERIFICATION)
+  
+  // Authentication
+  passwordHash String
+  emailVerified DateTime?
+  lastLoginAt   DateTime?
+  
+  // Multi-tenancy support
+  tenantId String?
+  
+  // Metadata
+  metadata Json? // Flexible field for additional user data
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  createdLessons     Lesson[]
+  studentSessions    StudentSession[]
+  studentProgress    StudentProgress[]
+  questionAttempts   QuestionAttempt[]
+  grades            Grade[]
+  auditLogs         AuditLog[]
+  userPreferences   UserPreference?
+  analyticsEvents   AnalyticsEvent[]
+  
+  // Indexes for performance
+  @@index([email])
+  @@index([role])
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+  
+  @@map("users")
+}
+
+model UserPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+  
+  // Learning preferences
+  autoplay       Boolean @default(true)
+  playbackSpeed  Float   @default(1.0)
+  subtitles      Boolean @default(false)
+  theme          String  @default("light")
+  language       String  @default("en")
+  
+  // Notification preferences
+  emailNotifications    Boolean @default(true)
+  progressNotifications Boolean @default(true)
+  
+  // Analytics preferences
+  allowAnalytics Boolean @default(true)
+  
+  // Custom preferences (JSON)
+  customSettings Json?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_preferences")
+}
+
+// ========================================
+// CONTENT HIERARCHY & STRUCTURE
+// ========================================
+
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Lesson {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  thumbnail   String?      // URL to lesson thumbnail
+  status      LessonStatus @default(DRAFT)
+  order       Int?         // Display order
+  
+  // Multi-tenancy
+  tenantId String?
+  
+  // Creator information
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  
+  // Learning objectives and metadata
+  objectives    String[] // Learning objectives array
+  estimatedTime Int?     // Estimated completion time in minutes
+  difficulty    String?  // beginner, intermediate, advanced
+  tags          String[] // Searchable tags
+  
+  // Flexible metadata
+  metadata Json?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+  
+  // Relations
+  videoGroups     VideoGroup[]
+  studentProgress StudentProgress[]
+  
+  // Indexes
+  @@index([status])
+  @@index([createdById])
+  @@index([tenantId])
+  @@index([publishedAt])
+  @@index([order])
+  
+  @@map("lessons")
+}
+
+model VideoGroup {
+  id          String  @id @default(cuid())
+  lessonId    String
+  title       String
+  description String?
+  order       Int     // Order within lesson
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  lesson Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  videos Video[]
+  
+  // Indexes
+  @@index([lessonId])
+  @@index([order])
+  
+  @@map("video_groups")
+}
+
+enum VideoStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  ERROR
+}
+
+model Video {
+  id           String      @id @default(cuid())
+  videoGroupId String
+  title        String
+  description  String?
+  order        Int         // Order within video group
+  status       VideoStatus @default(UPLOADING)
+  
+  // Google Cloud Storage integration
+  gcsPath      String?  // Path in Google Cloud Storage
+  gcsUrl       String?  // Public URL for streaming
+  duration     Int?     // Duration in seconds
+  size         BigInt?  // File size in bytes
+  mimeType     String?
+  
+  // Video processing metadata
+  processingStatus String? // Additional processing info
+  thumbnailUrl     String? // Generated thumbnail
+  
+  // Video metadata (JSONB for flexibility)
+  metadata Json? // Resolution, codecs, etc.
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  uploadedAt  DateTime?
+  processedAt DateTime?
+  
+  // Relations
+  videoGroup       VideoGroup        @relation(fields: [videoGroupId], references: [id], onDelete: Cascade)
+  milestones       Milestone[]
+  studentSessions  StudentSession[]
+  
+  // Indexes for performance
+  @@index([videoGroupId])
+  @@index([status])
+  @@index([order])
+  @@index([gcsPath])
+  
+  @@map("videos")
+}
+
+model Milestone {
+  id          String @id @default(cuid())
+  videoId     String
+  timestamp   Float  // Timestamp in seconds where video pauses
+  title       String
+  description String?
+  order       Int    // Order of milestones within video
+  
+  // Milestone configuration
+  isRequired Boolean @default(true) // Can students skip this milestone?
+  retryLimit Int     @default(3)    // Number of allowed attempts
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  video     Video      @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  questions Question[]
+  
+  // Indexes for fast milestone lookups during video playback
+  @@index([videoId])
+  @@index([timestamp])
+  @@index([order])
+  
+  @@map("milestones")
+}
+
+// ========================================
+// AI QUESTION MANAGEMENT & WORKFLOW
+// ========================================
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  FILL_IN_BLANK
+  MATCHING
+  ORDERING
+}
+
+enum QuestionStatus {
+  AI_GENERATED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
+}
+
+model Question {
+  id          String         @id @default(cuid())
+  milestoneId String
+  type        QuestionType
+  status      QuestionStatus @default(AI_GENERATED)
+  
+  // Question content
+  text        String         // Main question text
+  explanation String?        // Explanation for the answer
+  hints       String[]       // Optional hints array
+  difficulty  String?        // easy, medium, hard
+  
+  // Question data (JSONB for flexibility across question types)
+  questionData Json          // Stores options, correct answers, etc.
+  
+  // AI generation metadata
+  aiModel      String?       // Which AI model generated this
+  aiPrompt     String?       // Prompt used for generation
+  aiConfidence Float?        // AI confidence score
+  aiMetadata   Json?         // Additional AI metadata
+  
+  // Scoring configuration
+  points       Int    @default(1)
+  passThreshold Float @default(0.7) // Minimum score to pass (0.0-1.0)
+  
+  // Review workflow
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNotes  String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  milestone Milestone         @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  attempts  QuestionAttempt[]
+  
+  // Indexes
+  @@index([milestoneId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  
+  @@map("questions")
+}
+
+// ========================================
+// STUDENT PROGRESS & SESSION TRACKING
+// ========================================
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
+model StudentSession {
+  id        String        @id @default(cuid())
+  studentId String
+  videoId   String
+  status    SessionStatus @default(ACTIVE)
+  
+  // Session tracking
+  currentPosition    Float    @default(0) // Current video position in seconds
+  lastMilestoneId    String?              // Last milestone reached
+  completedMilestones String[]            // Array of completed milestone IDs
+  
+  // Device and browser info for cross-device sync
+  deviceInfo   Json? // Device information
+  browserInfo  Json? // Browser information
+  ipAddress    String?
+  userAgent    String?
+  
+  // Session metadata
+  sessionData Json? // Flexible session data
+  
+  // Timestamps
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  startedAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  completedAt DateTime?
+  
+  // Relations
+  student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  video   Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  
+  // Indexes for cross-device session management
+  @@index([studentId])
+  @@index([videoId])
+  @@index([status])
+  @@index([lastSeenAt])
+  @@unique([studentId, videoId]) // One active session per student per video
+  
+  @@map("student_sessions")
+}
+
+model StudentProgress {
+  id        String @id @default(cuid())
+  studentId String
+  lessonId  String
+  
+  // Progress tracking
+  isCompleted       Boolean   @default(false)
+  completionPercent Float     @default(0) // 0.0 to 100.0
+  totalTimeSpent    Int       @default(0) // Total time in seconds
+  
+  // Milestone tracking
+  totalMilestones     Int @default(0)
+  completedMilestones Int @default(0)
+  
+  // Performance metrics
+  averageScore    Float   @default(0)
+  totalAttempts   Int     @default(0)
+  successfulAttempts Int  @default(0)
+  
+  // Progress metadata (JSONB)
+  progressData Json?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  
+  // Relations
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  grades  Grade[]
+  
+  // Indexes for student progress queries
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([isCompleted])
+  @@index([completionPercent])
+  @@unique([studentId, lessonId]) // One progress record per student per lesson
+  
+  @@map("student_progress")
+}
+
+// ========================================
+// GRADING & ASSESSMENT SYSTEM
+// ========================================
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  CORRECT
+  INCORRECT
+  PARTIAL
+  TIMEOUT
+}
+
+model QuestionAttempt {
+  id         String        @id @default(cuid())
+  studentId  String
+  questionId String
+  status     AttemptStatus @default(IN_PROGRESS)
+  
+  // Attempt data
+  attemptNumber Int    // Which attempt (1, 2, 3, etc.)
+  studentAnswer Json   // Student's answer (flexible format)
+  isCorrect     Boolean?
+  score         Float  @default(0) // Partial credit scoring
+  timeSpent     Int    @default(0) // Time in seconds
+  
+  // Feedback and hints used
+  hintsUsed    String[] // Which hints were revealed
+  feedback     String?  // Automated feedback
+  
+  // Attempt metadata
+  attemptData Json? // Additional attempt data
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  submittedAt DateTime?
+  
+  // Relations
+  student  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // Indexes for grading queries
+  @@index([studentId])
+  @@index([questionId])
+  @@index([status])
+  @@index([isCorrect])
+  @@index([submittedAt])
+  
+  @@map("question_attempts")
+}
+
+enum GradeStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  RETRY_ALLOWED
+}
+
+model Grade {
+  id                String      @id @default(cuid())
+  studentId         String
+  studentProgressId String
+  
+  // Grade calculation
+  totalPoints       Int         @default(0)
+  earnedPoints      Int         @default(0)
+  percentageScore   Float       @default(0) // 0.0 to 100.0
+  letterGrade       String?     // A, B, C, D, F
+  status            GradeStatus @default(IN_PROGRESS)
+  
+  // Attempt tracking
+  totalAttempts     Int @default(0)
+  remainingAttempts Int @default(0)
+  
+  // Grade breakdown (JSONB for detailed analysis)
+  gradeBreakdown Json? // Per-milestone, per-question scores
+  
+  // Timestamps
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  finalizedAt DateTime?
+  
+  // Relations
+  student         User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentProgress StudentProgress @relation(fields: [studentProgressId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([studentId])
+  @@index([studentProgressId])
+  @@index([status])
+  @@index([percentageScore])
+  @@index([finalizedAt])
+  
+  @@map("grades")
+}
+
+// ========================================
+// ANALYTICS & REPORTING
+// ========================================
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  sessionId String?
+  
+  // Event details
+  eventType    String   // video_start, video_pause, question_attempt, etc.
+  eventData    Json     // Flexible event data
+  context      Json?    // Additional context (device, location, etc.)
+  
+  // Performance metrics
+  timestamp    DateTime @default(now())
+  processingTime Int?   // Processing time in milliseconds
+  
+  // Relations (optional - for easier querying)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // Indexes for analytics queries
+  @@index([userId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([sessionId])
+  
+  @@map("analytics_events")
+}
+
+// ========================================
+// SYSTEM CONFIGURATION & AUDIT
+// ========================================
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  
+  // Configuration metadata
+  description String?
+  category    String?
+  isPublic    Boolean @default(false) // Can be accessed by frontend
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([key])
+  @@index([category])
+  
+  @@map("system_configs")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  VIEW
+  DOWNLOAD
+  UPLOAD
+}
+
+model AuditLog {
+  id       String      @id @default(cuid())
+  userId   String?
+  action   AuditAction
+  resource String      // Table/resource affected
+  resourceId String?   // ID of affected resource
+  
+  // Audit details
+  changes     Json?     // What changed (before/after)
+  metadata    Json?     // Additional context
+  ipAddress   String?
+  userAgent   String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // Indexes for audit queries
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([resourceId])
+  @@index([createdAt])
+  
+  @@map("audit_logs")
+}
+
+// ========================================
+// AI API MANAGEMENT
+// ========================================
+
+enum AIProvider {
+  OPENAI
+  CLAUDE
+  GOOGLE_PALM
+  CUSTOM
+}
+
+model AIConfiguration {
+  id       String     @id @default(cuid())
+  provider AIProvider
+  name     String     // Configuration name
+  
+  // API configuration
+  apiKey      String?   // Encrypted API key
+  endpoint    String?   // Custom endpoint URL
+  model       String    // Model identifier
+  parameters  Json?     // Model parameters (temperature, max_tokens, etc.)
+  
+  // Usage configuration
+  isActive    Boolean   @default(true)
+  rateLimit   Int?      // Requests per minute
+  maxTokens   Int?      // Max tokens per request
+  
+  // Cost tracking
+  costPerToken Float?   // Cost per token
+  monthlyBudget Float?  // Monthly budget limit
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([provider])
+  @@index([isActive])
+  
+  @@map("ai_configurations")
+}
+
+model AIUsageLog {
+  id              String   @id @default(cuid())
+  configurationId String
+  
+  // Request details
+  requestType     String   // question_generation, content_analysis, etc.
+  prompt          String?  // Original prompt (if not sensitive)
+  response        String?  // AI response (if not sensitive)
+  
+  // Usage metrics
+  tokensUsed      Int
+  cost            Float?
+  responseTime    Int      // Response time in milliseconds
+  success         Boolean
+  errorMessage    String?
+  
+  // Context
+  userId          String?
+  resourceId      String?  // Related resource (question, milestone, etc.)
+  metadata        Json?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@index([configurationId])
+  @@index([requestType])
+  @@index([createdAt])
+  @@index([success])
+  
+  @@map("ai_usage_logs")
+}

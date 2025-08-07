@@ -1,0 +1,291 @@
+# Interactive Learning Platform - Git Ignore File
+
+# ===========================================
+# Dependencies
+# ===========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===========================================
+# Build Artifacts
+# ===========================================
+dist/
+build/
+out/
+coverage/
+.nyc_output/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/build/
+
+# TypeScript compiled files
+*.tsbuildinfo
+.tsbuildinfo
+
+# ===========================================
+# Environment & Configuration Files
+# ===========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Local development environment
+.env.dev
+.env.development
+
+# Production secrets (should never be committed)
+.env.production
+config/production.json
+config/production.js
+
+# ===========================================
+# Logs & Temporary Files
+# ===========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ===========================================
+# Cache & Temporary Directories
+# ===========================================
+.cache/
+.parcel-cache/
+.npm
+.eslintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Vite cache
+.vite/
+.vite-cache/
+
+# Next.js cache (if using Next.js in future)
+.next/
+
+# ===========================================
+# Database & Storage
+# ===========================================
+# SQLite databases (if using for development)
+*.sqlite
+*.sqlite3
+*.db
+
+# Database dumps and backups
+*.sql.gz
+*.dump
+database/backups/*.sql
+database/backups/*.gz
+
+# Prisma generated files (keep schema.prisma but ignore generated client)
+# Note: We want to keep the generated client, so this is commented out
+# prisma/generated/
+
+# ===========================================
+# Media & Uploads
+# ===========================================
+uploads/
+temp-uploads/
+public/uploads/
+static/uploads/
+
+# Video processing temporary files
+video-processing/
+temp-video/
+
+# ===========================================
+# Testing
+# ===========================================
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+
+# Jest
+.jest-cache/
+
+# ===========================================
+# IDE & Editor Files
+# ===========================================
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IntelliJ IDEA / WebStorm
+.idea/
+*.swp
+*.swo
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+
+# ===========================================
+# Operating System Files
+# ===========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ===========================================
+# Docker & DevOps
+# ===========================================
+# Docker volumes
+.docker-data/
+docker-data/
+
+# Kubernetes configs with secrets
+k8s-secrets/
+*.secret.yaml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# ===========================================
+# Security & Credentials
+# ===========================================
+# API keys and secrets
+.secrets/
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Google Cloud credentials
+gcp-service-account.json
+service-account-key.json
+
+# AWS credentials
+.aws/
+
+# ===========================================
+# Monitoring & Analytics
+# ===========================================
+# Application logs
+application.log
+error.log
+access.log
+debug.log
+
+# Performance monitoring
+newrelic.log
+.newrelic.yml
+
+# ===========================================
+# Development Tools
+# ===========================================
+# Storybook
+storybook-static/
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache
+.prettiercache
+
+# TypeScript incremental compilation
+*.tsbuildinfo
+
+# ===========================================
+# AI/ML Models & Data
+# ===========================================
+# Machine learning models (if storing locally)
+models/
+*.model
+*.pkl
+*.h5
+
+# Large datasets
+datasets/
+training-data/
+
+# ===========================================
+# Temporary & Miscellaneous
+# ===========================================
+# Temporary directories
+tmp/
+temp/
+.tmp/
+
+# Lock files (keep only one type)
+# If using npm, uncomment yarn.lock
+# yarn.lock
+
+# If using yarn, uncomment package-lock.json
+# package-lock.json
+
+# Archive files
+*.tar.gz
+*.zip
+*.rar
+
+# ===========================================
+# Project Specific
+# ===========================================
+# Documentation builds
+docs/build/
+docs/.docusaurus/
+
+# API documentation
+api-docs/generated/
+
+# Migration scripts output
+migration-output/
+
+# Backup files
+*.backup
+*.bak
+
+# Local development certificates
+localhost.pem
+localhost-key.pem
