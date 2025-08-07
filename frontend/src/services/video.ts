@@ -161,6 +161,7 @@ export const videoService = {
     description?: string
     tags?: string[]
     isPublic?: boolean
+    lessonId?: string
   }) {
     const response = await apiService.post<ApiResponse<VideoGroup>>('/videos/groups', data)
     return response.data

@@ -174,7 +174,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
         </button>
 
         <button
-          onClick={() => navigate('/lessons')}
+          onClick={() => navigate('/teacher/lessons')}
           className="card hover:bg-green-50 border hover:border-green-200 transition-all text-center p-6"
         >
           <div className="text-4xl mb-3">📊</div>
@@ -185,7 +185,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
         </button>
 
         <button
-          onClick={() => navigate('/lessons')}
+          onClick={() => navigate('/teacher/lessons')}
           className="card hover:bg-purple-50 border hover:border-purple-200 transition-all text-center p-6"
         >
           <div className="text-4xl mb-3">🎥</div>
@@ -257,7 +257,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
               ))}
               
               <button
-                onClick={() => navigate('/lessons')}
+                onClick={() => navigate('/teacher/lessons')}
                 className="w-full mt-4 btn-secondary"
               >
                 View All Lessons

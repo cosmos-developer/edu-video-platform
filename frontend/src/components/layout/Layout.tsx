@@ -22,6 +22,13 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Lessons', href: '/lessons', icon: BookOpenIcon },
   ]
 
+  // Add teacher specific navigation
+  if (user?.role === 'TEACHER') {
+    navigation.push(
+      { name: 'My Lessons', href: '/teacher/lessons', icon: UserIcon }
+    )
+  }
+
   // Add admin/teacher specific navigation
   if (user?.role === 'ADMIN' || user?.role === 'TEACHER') {
     navigation.push(

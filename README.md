@@ -25,14 +25,18 @@ An interactive video-based learning system that pauses at key milestones to pres
 #### 2.2 Teachers (Content Creators)
 - **Access**: Content creation and management tools
 - **Capabilities**:
-  - Upload videos to Google database
-  - Annotate videos with milestone markers
+  - Create and manage lessons with metadata (title, description, difficulty, tags, estimated time)
+  - Save lessons as drafts for iterative development
+  - Upload videos to Google database with automatic video group creation
+  - Annotate videos with milestone markers and timestamps
   - Request AI-generated questions for milestones
-  - Review and approve AI-generated questions
-  - Set retry limits for questions
-  - Publish/unpublish lessons
-  - View student progress analytics for their content
-- **Restrictions**: Can only manage their own content
+  - Review and approve AI-generated questions before publication
+  - Set retry limits and grading criteria for questions
+  - Publish/unpublish lessons when content is ready
+  - View and manage personal lesson library with status filtering (Draft/Published/Archived)
+  - Access comprehensive student progress analytics for their content
+  - Search and organize lesson content efficiently
+- **Restrictions**: Can only manage their own content, cannot access other teachers' drafts
 
 #### 2.3 Administrators
 - **Access**: Full system access
@@ -53,13 +57,16 @@ An interactive video-based learning system that pauses at key milestones to pres
 4. Individual Questions at Milestones
 
 #### 3.2 Content Lifecycle
-1. **Upload**: Teacher uploads video to Google database
-2. **Annotation**: Teacher marks milestone timestamps
-3. **Question Generation**: AI generates questions based on annotations
-4. **Review**: Teacher reviews and approves questions
-5. **Configuration**: Teacher sets retry limits and grading criteria
-6. **Publication**: Lesson becomes available to students
-7. **Analytics**: System tracks student engagement and performance
+1. **Lesson Creation**: Teacher creates lesson with metadata (title, description, difficulty, estimated time, tags)
+2. **Draft Storage**: Lesson saved as DRAFT status for iterative development
+3. **Video Upload**: Teacher uploads videos with automatic video group creation
+4. **Annotation**: Teacher marks milestone timestamps on videos
+5. **Question Generation**: AI generates questions based on milestone annotations
+6. **Review & Approval**: Teacher reviews, edits, and approves AI-generated questions
+7. **Configuration**: Teacher sets retry limits, grading criteria, and question parameters
+8. **Publication**: Teacher publishes lesson (DRAFT → PUBLISHED), making it available to students
+9. **Analytics**: System tracks student engagement, progress, and performance metrics
+10. **Management**: Teachers can archive, update, or unpublish lessons as needed
 
 ### 4. Core Functionality
 
@@ -109,11 +116,16 @@ An interactive video-based learning system that pauses at key milestones to pres
 - Mobile-responsive design
 
 #### 6.2 Teacher Experience
-- Intuitive video annotation tools
-- Easy milestone management
-- AI question review interface
-- Comprehensive analytics dashboard
-- Bulk content management capabilities
+- **Lesson Creation Workflow**: Streamlined lesson creation with comprehensive metadata fields
+- **Draft Management**: Save and resume work on lessons with DRAFT status
+- **Content Organization**: Personal lesson library with filtering (All/Draft/Published/Archived)
+- **Search & Discovery**: Efficient lesson search and organization tools
+- **Video Upload**: Simple video upload with automatic video group creation
+- **Intuitive Annotation Tools**: Easy milestone marker placement and timestamp management
+- **AI Integration**: Seamless AI question generation with review and approval workflow
+- **Publishing Control**: One-click publishing when lessons are ready for students
+- **Analytics Dashboard**: Comprehensive student progress and engagement analytics
+- **Status Management**: Clear visual indicators for lesson status (Draft/Published/Archived)
 
 #### 6.3 Admin Experience
 - System-wide visibility and control
@@ -170,21 +182,70 @@ An interactive video-based learning system that pauses at key milestones to pres
 - Backup and disaster recovery
 - Load balancing and scaling
 
-### 10. Success Criteria
+### 10. Teacher Lesson Management Workflow
 
-#### 10.1 Educational Outcomes
+#### 10.1 Lesson Creation Process
+1. **Initial Setup**:
+   - Teacher navigates to "Create New Lesson" from dashboard or "My Lessons" page
+   - Fills out lesson metadata:
+     - **Title**: Descriptive lesson name
+     - **Description**: Learning objectives and overview
+     - **Difficulty**: Beginner/Intermediate/Advanced
+     - **Estimated Time**: Duration in minutes
+     - **Tags**: Searchable keywords for organization
+
+2. **Draft Storage**:
+   - Lesson automatically saved as DRAFT status
+   - Teacher can return to work on lesson iteratively
+   - Draft lessons only visible to creator
+
+3. **Content Development**:
+   - **Video Upload**: Teacher uploads videos with automatic video group creation
+   - **Milestone Annotation**: Place markers at key learning points
+   - **AI Question Generation**: Generate questions for each milestone
+   - **Content Review**: Review and approve AI-generated questions
+
+4. **Publishing**:
+   - Teacher reviews complete lesson
+   - One-click publish converts DRAFT → PUBLISHED
+   - Published lessons become available to students
+
+#### 10.2 Lesson Management Features
+- **Personal Library**: Dedicated "My Lessons" page for teachers
+- **Status Filtering**: Filter by All/Draft/Published/Archived
+- **Search Functionality**: Find lessons by title, description, or tags
+- **Status Indicators**: Color-coded badges (yellow=draft, green=published)
+- **Bulk Actions**: Publish, archive, or delete multiple lessons
+- **Progress Tracking**: View student engagement metrics per lesson
+
+#### 10.3 Navigation & Access
+- **Teacher Dashboard**: Quick access to lesson creation and management
+- **Sidebar Navigation**: "My Lessons" menu item for teachers
+- **Role-Based Access**: Teachers see only their own content
+- **Security**: Draft lessons protected from unauthorized access
+
+#### 10.4 Technical Implementation
+- **Backend**: Role-based filtering with `createdById` parameter
+- **Frontend**: Dedicated React components for teacher workflow
+- **Database**: Lesson status tracking (DRAFT/PUBLISHED/ARCHIVED)
+- **API Integration**: RESTful endpoints for CRUD operations
+- **Real-time Updates**: Lesson status changes reflected immediately
+
+### 11. Success Criteria
+
+#### 11.1 Educational Outcomes
 - Improved learning retention through interactive engagement
 - Measurable progress tracking and assessment
 - Positive user feedback and adoption rates
 - Demonstrated learning effectiveness
 
-#### 10.2 Technical Success
+#### 11.2 Technical Success
 - Stable, scalable platform performance
 - Successful AI integration and question generation
 - Seamless user experience across all roles
 - Comprehensive analytics and reporting capabilities
 
-## Next Steps
+## 12. Next Steps
 1. Detailed technical architecture design
 2. Database schema development
 3. UI/UX wireframes and prototypes

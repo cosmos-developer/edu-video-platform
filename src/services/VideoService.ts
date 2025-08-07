@@ -120,60 +120,57 @@ export class VideoService {
   }
 
   static async getVideoGroupById(groupId: string, userId: string) {
-    const videoGroup = await prisma.videoGroup.findFirst({
-      where: {
-        id: groupId,
-        lesson: {
-          OR: [
-            { createdById: userId },
-            {
-              studentProgress: {
-                some: {
-                  studentId: userId
-                }
-              }
-            }
-          ]
-        }
-      },
-      include: {
-        videos: {
-          orderBy: { order: 'asc' },
-          include: {
-            milestones: {
-              orderBy: { timestamp: 'asc' },
-              include: {
-                questions: {
-                  include: {
-                    question: true
+    try {
+      const videoGroup = await prisma.videoGroup.findFirst({
+        where: {
+          id: groupId,
+          lesson: {
+            OR: [
+              { createdById: userId },
+              {
+                studentProgress: {
+                  some: {
+                    studentId: userId
                   }
                 }
               }
-            },
-            _count: {
-              select: { 
-                milestones: true,
-                studentSessions: true 
-              }
-            }
+            ]
           }
         },
-        lesson: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true
+        include: {
+          videos: {
+            orderBy: { order: 'asc' },
+            include: {
+              // Simplified includes - just get milestones without deep nesting
+              milestones: {
+                orderBy: { timestamp: 'asc' }
+              },
+              _count: {
+                select: { 
+                  milestones: true,
+                  studentSessions: true 
+                }
               }
             }
+          },
+          lesson: {
+            select: {
+              id: true,
+              title: true,
+              createdById: true
+            }
+          },
+          _count: {
+            select: { videos: true }
           }
         }
-      }
-    })
+      })
 
-    return videoGroup
+      return videoGroup
+    } catch (error: any) {
+      console.error('Error in getVideoGroupById:', error)
+      throw new Error(`Failed to fetch video group: ${error.message}`)
+    }
   }
 
   static async createVideoGroup(data: CreateVideoGroupData, lessonId: string) {
@@ -257,227 +254,191 @@ export class VideoService {
   }
 
   static async createVideo(data: CreateVideoData, user: User) {
-    // Check if video group exists and user has permission
-    const videoGroup = await prisma.videoGroup.findUnique({
-      where: { id: data.videoGroupId },
-      include: {
-        lesson: true
-      }
-    })
-
-    if (!videoGroup) {
-      throw new Error('Video group not found')
-    }
-
-    // Check permissions - only lesson creator or admin can add videos
-    if (videoGroup.lesson.createdById !== user.id && user.role !== 'ADMIN') {
-      throw new Error('Access denied')
-    }
-
-    // Get the next order number
-    const maxOrder = await prisma.video.aggregate({
-      where: { videoGroupId: data.videoGroupId },
-      _max: { order: true }
-    })
-
-    const nextOrder = (maxOrder._max.order || 0) + 1
-
-    // Process video file if provided
-    let videoMetadata = null
-    let thumbnailPath = null
-    let fileSize: bigint = BigInt(0)
-
-    if (data.filename && data.filePath) {
-      const fullPath = getVideoFilePath(data.filename)
-      
-      // Validate file exists
-      const fileExists = await VideoProcessingService.validateVideoFile(fullPath)
-      if (!fileExists) {
-        throw new Error('Video file not found after upload')
-      }
-
-      // Get file size
-      const size = await VideoProcessingService.getFileSize(fullPath)
-      fileSize = BigInt(size)
-
-      // Get video metadata
-      videoMetadata = await VideoProcessingService.getVideoMetadata(fullPath)
-
-      // Generate thumbnail
-      const thumbnailFilename = await VideoProcessingService.generateThumbnail(fullPath, data.filename)
-      if (thumbnailFilename) {
-        thumbnailPath = thumbnailFilename
-      }
-    }
-
-    const video = await prisma.video.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        filePath: data.filePath || null,
-        fileName: data.originalName || data.filename || null,
-        duration: videoMetadata?.duration ? Math.round(videoMetadata.duration) : null,
-        size: fileSize || null,
-        mimeType: data.mimeType || null,
-        thumbnailPath: thumbnailPath,
-        metadata: videoMetadata ? {
-          width: videoMetadata.width,
-          height: videoMetadata.height,
-          bitrate: videoMetadata.bitrate,
-          fps: videoMetadata.fps,
-          codec: videoMetadata.codec
-        } : undefined,
-        videoGroupId: data.videoGroupId,
-        uploadedAt: new Date(),
-        order: nextOrder,
-        status: 'READY' // Set to READY for local files
-      },
-      include: {
-        milestones: {
-          orderBy: { timestamp: 'asc' },
-          include: {
-            questions: {
-              include: {
-                question: true
-              }
-            }
-          }
-        },
-        _count: {
-          select: { 
-            milestones: true,
-            studentSessions: true 
-          }
+    try {
+      // Check if video group exists and user has permission
+      const videoGroup = await prisma.videoGroup.findUnique({
+        where: { id: data.videoGroupId },
+        include: {
+          lesson: true
         }
-      }
-    })
+      })
 
-    return video
+      if (!videoGroup) {
+        throw new Error('Video group not found')
+      }
+
+      // Check permissions - only lesson creator or admin can add videos
+      if (videoGroup.lesson.createdById !== user.id && user.role !== 'ADMIN') {
+        throw new Error('Access denied')
+      }
+
+      // Get the next order number
+      const maxOrder = await prisma.video.aggregate({
+        where: { videoGroupId: data.videoGroupId },
+        _max: { order: true }
+      })
+
+      const nextOrder = (maxOrder._max.order || 0) + 1
+
+      // Create video with minimal processing for reliability
+      const video = await prisma.video.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          videoGroupId: data.videoGroupId,
+          order: nextOrder,
+          filePath: data.filePath,
+          fileName: data.originalName || data.filename,
+          mimeType: data.mimeType,
+          uploadedAt: new Date(),
+          status: 'READY'
+        }
+      })
+
+      return video
+
+    } catch (error: any) {
+      console.error('Error in createVideo:', error)
+      
+      // Re-throw known errors
+      if (error.message === 'Video group not found' || error.message === 'Access denied') {
+        throw error
+      }
+      
+      // Handle Prisma errors
+      if (error.code && error.code.startsWith('P')) {
+        throw new Error(`Database error: ${error.message}`)
+      }
+      
+      // Other errors
+      throw new Error(`Failed to create video: ${error.message}`)
+    }
   }
 
   static async getVideoById(videoId: string, userId: string) {
-    const video = await prisma.video.findFirst({
-      where: {
-        id: videoId,
-        videoGroup: {
-          lesson: {
-            OR: [
-              { createdById: userId },
-              {
-                studentProgress: {
-                  some: {
-                    studentId: userId
-                  }
-                }
-              }
-            ]
-          }
-        }
-      },
-      include: {
-        milestones: {
-          orderBy: { timestamp: 'asc' },
-          include: {
-            questions: {
-              include: {
-                question: true
-              }
-            }
-          }
-        },
-        videoGroup: {
-          include: {
+    try {
+      const video = await prisma.video.findFirst({
+        where: {
+          id: videoId,
+          videoGroup: {
             lesson: {
-              include: {
-                createdBy: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true
+              OR: [
+                { createdById: userId },
+                {
+                  studentProgress: {
+                    some: {
+                      studentId: userId
+                    }
                   }
                 }
-              }
+              ]
             }
           }
         },
-        _count: {
-          select: { 
-            milestones: true,
-            studentSessions: true 
+        include: {
+          // Simplified includes to avoid complex nested queries
+          milestones: {
+            orderBy: { timestamp: 'asc' }
+          },
+          videoGroup: {
+            select: {
+              id: true,
+              title: true,
+              description: true
+            }
+          },
+          _count: {
+            select: { 
+              milestones: true,
+              studentSessions: true 
+            }
           }
         }
-      }
-    })
+      })
 
-    return video
+      return video
+    } catch (error: any) {
+      console.error('Error in getVideoById:', error)
+      throw new Error(`Failed to fetch video: ${error.message}`)
+    }
   }
 
   static async updateVideo(videoId: string, data: UpdateVideoData, user: User) {
-    // Check if video exists and user has permission
-    const existingVideo = await prisma.video.findUnique({
-      where: { id: videoId },
-      include: {
-        videoGroup: {
-          include: {
-            lesson: true
-          }
-        }
-      }
-    })
-
-    if (!existingVideo) {
-      throw new Error('Video not found')
-    }
-
-    // Check permissions - only lesson creator or admin can update
-    if (
-      existingVideo.videoGroup.lesson.createdById !== user.id && 
-      user.role !== 'ADMIN'
-    ) {
-      throw new Error('Access denied')
-    }
-
-    // Filter out undefined values
-    const updateData: any = {}
-    if (data.title !== undefined) updateData.title = data.title
-    if (data.description !== undefined) updateData.description = data.description
-    if (data.filePath !== undefined) updateData.filePath = data.filePath
-    if (data.mimeType !== undefined) updateData.mimeType = data.mimeType
-    if (data.duration !== undefined) updateData.duration = data.duration
-    if (data.thumbnailPath !== undefined) updateData.thumbnailPath = data.thumbnailPath
-
-    const video = await prisma.video.update({
-      where: { id: videoId },
-      data: updateData,
-      include: {
-        milestones: {
-          orderBy: { timestamp: 'asc' },
-          include: {
-            questions: {
-              include: {
-                question: true
-              }
+    try {
+      // Check if video exists and user has permission
+      const existingVideo = await prisma.video.findUnique({
+        where: { id: videoId },
+        include: {
+          videoGroup: {
+            include: {
+              lesson: true
             }
           }
-        },
-        videoGroup: {
-          select: {
-            id: true,
-            title: true,
-            description: true
-          }
-        },
-        _count: {
-          select: { 
-            milestones: true,
-            studentSessions: true 
+        }
+      })
+
+      if (!existingVideo) {
+        throw new Error('Video not found')
+      }
+
+      // Check permissions - only lesson creator or admin can update
+      if (
+        existingVideo.videoGroup.lesson.createdById !== user.id && 
+        user.role !== 'ADMIN'
+      ) {
+        throw new Error('Access denied')
+      }
+
+      // Filter out undefined values
+      const updateData: any = {}
+      if (data.title !== undefined) updateData.title = data.title
+      if (data.description !== undefined) updateData.description = data.description
+      if (data.filePath !== undefined) updateData.filePath = data.filePath
+      if (data.mimeType !== undefined) updateData.mimeType = data.mimeType
+      if (data.duration !== undefined) updateData.duration = data.duration
+      if (data.thumbnailPath !== undefined) updateData.thumbnailPath = data.thumbnailPath
+
+      const video = await prisma.video.update({
+        where: { id: videoId },
+        data: updateData,
+        include: {
+          // Simplified includes
+          milestones: {
+            orderBy: { timestamp: 'asc' }
+          },
+          videoGroup: {
+            select: {
+              id: true,
+              title: true,
+              description: true
+            }
+          },
+          _count: {
+            select: { 
+              milestones: true,
+              studentSessions: true 
+            }
           }
         }
-      }
-    })
+      })
 
-    return video
+      return video
+    } catch (error: any) {
+      console.error('Error in updateVideo:', error)
+      
+      // Re-throw known errors
+      if (error.message === 'Video not found' || error.message === 'Access denied') {
+        throw error
+      }
+      
+      // Handle Prisma errors
+      if (error.code && error.code.startsWith('P')) {
+        throw new Error(`Database error: ${error.message}`)
+      }
+      
+      // Other errors
+      throw new Error(`Failed to update video: ${error.message}`)
+    }
   }
 
   static async deleteVideo(videoId: string, user: User) {

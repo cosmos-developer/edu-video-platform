@@ -36,13 +36,19 @@ export default function CreateLessonPage() {
     )
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked
       setFormData(prev => ({
         ...prev,
         [name]: checked
+      }))
+    } else if (name === 'estimatedTime') {
+      const numValue = value ? parseInt(value) : undefined
+      setFormData(prev => ({
+        ...prev,
+        [name]: numValue
       }))
     } else {
       setFormData(prev => ({
@@ -174,6 +180,42 @@ export default function CreateLessonPage() {
               />
             </div>
 
+            {/* Difficulty */}
+            <div>
+              <label htmlFor="difficulty" className="block text-sm font-medium text-gray-700 mb-2">
+                Difficulty Level
+              </label>
+              <select
+                id="difficulty"
+                name="difficulty"
+                value={formData.difficulty}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+
+            {/* Estimated Time */}
+            <div>
+              <label htmlFor="estimatedTime" className="block text-sm font-medium text-gray-700 mb-2">
+                Estimated Time (minutes)
+              </label>
+              <input
+                type="number"
+                id="estimatedTime"
+                name="estimatedTime"
+                value={formData.estimatedTime || ''}
+                onChange={handleInputChange}
+                placeholder="e.g. 30"
+                min="1"
+                max="300"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
             {/* Tags */}
             <div>
               <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
@@ -217,23 +259,19 @@ export default function CreateLessonPage() {
               )}
             </div>
 
-            {/* Visibility */}
-            <div>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="isPublic"
-                  checked={formData.isPublic}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="ml-2 text-sm text-gray-700">
-                  Make this lesson public (visible to all students)
-                </span>
-              </label>
-              <p className="text-xs text-gray-500 mt-1">
-                Private lessons are only visible to students you explicitly grant access to.
-              </p>
+            {/* Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-start space-x-3">
+                <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h3 className="text-sm font-medium text-blue-800 mb-1">Draft Mode</h3>
+                  <p className="text-sm text-blue-700">
+                    Your lesson will be saved as a draft. You can add videos, create milestones, and publish it when ready.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Submit */}

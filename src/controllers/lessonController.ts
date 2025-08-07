@@ -28,32 +28,50 @@ export const lessonController = {
         where.tenantId = currentUser.tenantId;
       }
 
+      // Additional filters first
+      if (status) where.status = status as LessonStatus;
+      if (difficulty) where.difficulty = difficulty as string;
+
       // Role-based filtering
       if (currentUser.role === 'TEACHER') {
-        // Teachers can only see their own lessons and published lessons
-        where.OR = [
-          { createdById: currentUser.id },
-          { status: 'PUBLISHED' }
-        ];
+        // If createdById filter is requested and it's the teacher's own ID, allow it
+        if (createdById && createdById === currentUser.id) {
+          where.createdById = currentUser.id;
+        } else {
+          // Teachers can only see their own lessons and published lessons
+          where.OR = [
+            { createdById: currentUser.id },
+            { status: 'PUBLISHED' }
+          ];
+        }
       } else if (currentUser.role === 'STUDENT') {
         // Students can only see published lessons
         where.status = 'PUBLISHED';
+      } else if (currentUser.role === 'ADMIN') {
+        // Admins can filter by any createdById
+        if (createdById) {
+          where.createdById = createdById as string;
+        }
       }
 
-      // Additional filters
-      if (status) where.status = status as LessonStatus;
-      if (difficulty) where.difficulty = difficulty as string;
-      if (createdById && currentUser.role === 'ADMIN') {
-        where.createdById = createdById as string;
-      }
-
-      // Search functionality
+      // Search functionality (needs to be combined with existing OR conditions)
       if (search) {
-        where.OR = [
+        const searchConditions = [
           { title: { contains: search as string, mode: 'insensitive' } },
           { description: { contains: search as string, mode: 'insensitive' } },
           { tags: { has: search as string } }
         ];
+
+        if (where.OR) {
+          // Combine existing OR conditions with search using AND
+          where.AND = [
+            { OR: where.OR },
+            { OR: searchConditions }
+          ];
+          delete where.OR;
+        } else {
+          where.OR = searchConditions;
+        }
       }
 
       const lessons = await prisma.lesson.findMany({
@@ -98,11 +116,11 @@ export const lessonController = {
 
       res.json({
         success: true,
-        data: lessons,
-        pagination: {
+        data: {
+          items: lessons,
+          total,
           page: Number(page),
           limit: Number(limit),
-          total,
           totalPages: Math.ceil(total / Number(limit))
         }
       });

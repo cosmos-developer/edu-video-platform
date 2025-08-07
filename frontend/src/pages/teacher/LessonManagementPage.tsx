@@ -10,6 +10,82 @@ import { MilestoneEditor } from '../../components/teacher/MilestoneEditor'
 import { QuestionEditor } from '../../components/teacher/QuestionEditor'
 import { AIQuestionGenerator } from '../../components/teacher/AIQuestionGenerator'
 
+// Wrapper component to handle VideoGroup creation
+interface VideoUploadFormWrapperProps {
+  lesson: Lesson | null
+  videoGroups: VideoGroup[]
+  onVideoUploaded: (video: Video) => void
+  onClose: () => void
+  getOrCreateVideoGroup: () => Promise<string>
+}
+
+function VideoUploadFormWrapper({ lesson, videoGroups, onVideoUploaded, onClose, getOrCreateVideoGroup }: VideoUploadFormWrapperProps) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [groupId, setGroupId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const initializeVideoGroup = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        const id = await getOrCreateVideoGroup()
+        setGroupId(id)
+      } catch (err: any) {
+        console.error('Error getting video group:', err)
+        setError(err.message || 'Failed to initialize video group')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initializeVideoGroup()
+  }, [getOrCreateVideoGroup])
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Preparing video upload...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button onClick={onClose} className="btn-primary">
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!groupId) {
+    return null
+  }
+
+  return (
+    <VideoUploadForm
+      groupId={groupId}
+      onVideoUploaded={onVideoUploaded}
+      onClose={onClose}
+    />
+  )
+}
+
 export default function LessonManagementPage() {
   const { lessonId } = useParams<{ lessonId: string }>()
   const navigate = useNavigate()
@@ -82,6 +158,28 @@ export default function LessonManagementPage() {
     // For now, we'll refresh the lesson data to get updated video groups
     loadLesson()
     setShowVideoUpload(false)
+  }
+
+  const getOrCreateVideoGroup = async (): Promise<string> => {
+    if (!lesson) throw new Error('No lesson available')
+    
+    // If lesson already has video groups, use the first one
+    if (videoGroups.length > 0) {
+      return videoGroups[0].id
+    }
+    
+    // Create a default video group for this lesson
+    try {
+      const videoGroup = await videoService.createVideoGroup({
+        title: `${lesson.title} - Videos`,
+        description: `Video group for lesson: ${lesson.title}`,
+        lessonId: lesson.id
+      })
+      return videoGroup.id
+    } catch (error) {
+      console.error('Error creating video group:', error)
+      throw error
+    }
   }
 
   const handleMilestoneAdded = (milestone: Milestone) => {
@@ -401,10 +499,12 @@ export default function LessonManagementPage() {
 
       {/* Modals */}
       {showVideoUpload && lessonId && (
-        <VideoUploadForm
-          groupId={lessonId}
+        <VideoUploadFormWrapper
+          lesson={lesson}
+          videoGroups={videoGroups}
           onVideoUploaded={handleVideoAdded}
           onClose={() => setShowVideoUpload(false)}
+          getOrCreateVideoGroup={getOrCreateVideoGroup}
         />
       )}
 

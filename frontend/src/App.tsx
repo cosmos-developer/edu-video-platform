@@ -10,6 +10,7 @@ import LessonsPage from './pages/lessons/LessonsPage'
 import LessonDetailPage from './pages/lessons/LessonDetailPage'
 import VideoPlayerPage from './pages/video/VideoPlayerPage'
 import CreateLessonPage from './pages/teacher/CreateLessonPage'
+import TeacherLessonsPage from './pages/teacher/TeacherLessonsPage'
 import LessonManagementPage from './pages/teacher/LessonManagementPage'
 import LoadingSpinner from './components/ui/LoadingSpinner'
 
@@ -88,6 +89,7 @@ function App() {
                         <Route path="/lessons/:id" element={<LessonDetailPage />} />
                         <Route path="/video/:videoId" element={<VideoPlayerPage />} />
                         <Route path="/teacher/create-lesson" element={<CreateLessonPage />} />
+                        <Route path="/teacher/lessons" element={<TeacherLessonsPage />} />
                         <Route path="/teacher/lessons/:lessonId" element={<LessonManagementPage />} />
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       </Routes>
