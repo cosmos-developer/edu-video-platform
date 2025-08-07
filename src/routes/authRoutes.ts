@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import authService from '../services/auth/authService';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validation/validateRequest';
 import { logger } from '../utils/logger';
-import { authenticate } from '../middleware/auth/authMiddleware';
+import { authenticate, AuthenticatedRequest } from '../middleware/auth/authMiddleware';
 import { AppError } from '../types';
 
 const router = Router();
@@ -61,7 +61,7 @@ const refreshTokenValidation = [
 router.post('/login',
   loginValidation,
   validateRequest,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
       
@@ -73,7 +73,7 @@ router.post('/login',
         userAgent: req.get('User-Agent')
       });
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           user: result.user,
@@ -106,7 +106,7 @@ router.post('/login',
 router.post('/register',
   registerValidation,
   validateRequest,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const registrationData = req.body;
       
@@ -151,7 +151,7 @@ router.post('/register',
 router.post('/refresh',
   refreshTokenValidation,
   validateRequest,
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     try {
       const { refreshToken } = req.body;
       
@@ -188,7 +188,7 @@ router.post('/refresh',
 // POST /api/auth/logout - User logout
 router.post('/logout',
   authenticate,
-  async (req, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user!.id;
       
@@ -216,7 +216,7 @@ router.post('/logout',
 // GET /api/auth/me - Get current user profile
 router.get('/me',
   authenticate,
-  async (req, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const user = req.user!;
       

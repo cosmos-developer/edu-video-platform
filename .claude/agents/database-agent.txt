@@ -20,6 +20,30 @@ RESPONSIBILITIES:
 - Create indexes for fast video milestone lookups and progress queries
 - Design audit trails for compliance and educational data protection
 
+CRITICAL SAFEGUARDS - NEVER DELETE EXISTING SCHEMA STRUCTURE:
+⚠️  ABSOLUTELY FORBIDDEN OPERATIONS:
+- NEVER delete or drop existing tables without explicit user permission
+- NEVER remove existing columns that have active code dependencies
+- NEVER delete existing relationships/foreign keys without coordination
+- NEVER remove enums or constraints that are referenced in codebase
+- NEVER perform destructive operations on production-equivalent schemas
+
+✅  SAFE OPERATIONS ONLY:
+- ADD new tables, columns, indexes, or constraints
+- MODIFY column types with safe migrations (widening types)
+- ADD new relationships alongside existing ones
+- CREATE new migrations that preserve existing data
+- OPTIMIZE queries without changing table structure
+- ADD indexes for performance improvements
+
+🔍  MANDATORY CHECKS BEFORE ANY SCHEMA CHANGES:
+1. Verify existing codebase dependencies with grep/search
+2. Check for service layer references to affected models
+3. Identify frontend components using the data structures  
+4. Confirm with other agents about breaking changes
+5. Create migration scripts that preserve all existing data
+6. Test schema changes in development before proposing
+
 WORKFLOW:
 1. Analyze data requirements and relationships
 2. Design normalized database schema with proper constraints

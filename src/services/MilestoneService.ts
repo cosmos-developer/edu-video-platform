@@ -8,23 +8,28 @@ interface CreateMilestoneData {
   timestamp: number
   title: string
   description: string | null
-  type: 'PAUSE' | 'QUIZ' | 'CHECKPOINT'
+  isRequired?: boolean
+  retryLimit?: number
 }
 
 interface UpdateMilestoneData {
   timestamp?: number
   title?: string
   description?: string
-  type?: 'PAUSE' | 'QUIZ' | 'CHECKPOINT'
+  isRequired?: boolean
+  retryLimit?: number
 }
 
 interface CreateQuestionData {
   milestoneId: string
-  type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER'
-  question: string
+  type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'FILL_IN_BLANK'
+  text: string
   explanation: string | null
-  options: string[]
-  correctAnswer: string
+  hints?: string[]
+  difficulty?: string
+  questionData: any // Flexible JSON data for different question types
+  points?: number
+  passThreshold?: number
 }
 
 export class MilestoneService {
@@ -33,7 +38,11 @@ export class MilestoneService {
     const video = await prisma.video.findUnique({
       where: { id: data.videoId },
       include: {
-        videoGroup: true
+        videoGroup: {
+          include: {
+            lesson: true
+          }
+        }
       }
     })
 
@@ -41,10 +50,10 @@ export class MilestoneService {
       throw new Error('Video not found')
     }
 
-    // Check permissions - only video uploader, group creator, or admin can create milestones
+    // Check permissions - only video uploader, lesson creator, or admin can create milestones
     if (
       video.uploadedBy !== user.id && 
-      video.videoGroup.createdBy !== user.id && 
+      video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
       throw new Error('Access denied')
@@ -62,18 +71,28 @@ export class MilestoneService {
       throw new Error(`Milestone already exists at timestamp ${data.timestamp}`)
     }
 
+    // Get the next order number for this video
+    const maxOrder = await prisma.milestone.aggregate({
+      where: { videoId: data.videoId },
+      _max: { order: true }
+    })
+
+    const nextOrder = (maxOrder._max.order || 0) + 1
+
     const milestone = await prisma.milestone.create({
       data: {
         videoId: data.videoId,
         timestamp: data.timestamp,
         title: data.title,
         description: data.description,
-        type: data.type
+        order: nextOrder,
+        isRequired: data.isRequired ?? true,
+        retryLimit: data.retryLimit ?? 3
       },
       include: {
         questions: {
           include: {
-            options: true
+            questionData: true
           }
         },
         _count: {
@@ -91,21 +110,18 @@ export class MilestoneService {
       where: {
         id: videoId,
         videoGroup: {
-          OR: [
-            { isPublic: true },
-            { createdBy: userId },
-            {
-              videos: {
-                some: {
-                  studentSessions: {
-                    some: {
-                      userId: userId
-                    }
+          lesson: {
+            OR: [
+              { createdById: userId },
+              {
+                studentProgress: {
+                  some: {
+                    studentId: userId
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       }
     })
@@ -119,7 +135,7 @@ export class MilestoneService {
       include: {
         questions: {
           include: {
-            options: true
+            questionData: true
           }
         },
         _count: {
@@ -139,7 +155,11 @@ export class MilestoneService {
       include: {
         video: {
           include: {
-            videoGroup: true
+            videoGroup: {
+              include: {
+                lesson: true
+              }
+            }
           }
         }
       }
@@ -149,10 +169,10 @@ export class MilestoneService {
       throw new Error('Milestone not found')
     }
 
-    // Check permissions - only video uploader, group creator, or admin can update milestones
+    // Check permissions - only video uploader, lesson creator, or admin can update milestones
     if (
       existingMilestone.video.uploadedBy !== user.id && 
-      existingMilestone.video.videoGroup.createdBy !== user.id && 
+      existingMilestone.video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
       throw new Error('Access denied')
@@ -178,7 +198,8 @@ export class MilestoneService {
     if (data.timestamp !== undefined) updateData.timestamp = data.timestamp
     if (data.title !== undefined) updateData.title = data.title
     if (data.description !== undefined) updateData.description = data.description
-    if (data.type !== undefined) updateData.type = data.type
+    if (data.isRequired !== undefined) updateData.isRequired = data.isRequired
+    if (data.retryLimit !== undefined) updateData.retryLimit = data.retryLimit
 
     const milestone = await prisma.milestone.update({
       where: { id: milestoneId },
@@ -186,7 +207,7 @@ export class MilestoneService {
       include: {
         questions: {
           include: {
-            options: true
+            questionData: true
           }
         },
         _count: {
@@ -215,10 +236,10 @@ export class MilestoneService {
       throw new Error('Milestone not found')
     }
 
-    // Check permissions - only video uploader, group creator, or admin can delete milestones
+    // Check permissions - only video uploader, lesson creator, or admin can delete milestones
     if (
       existingMilestone.video.uploadedBy !== user.id && 
-      existingMilestone.video.videoGroup.createdBy !== user.id && 
+      existingMilestone.video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
       throw new Error('Access denied')
@@ -238,7 +259,11 @@ export class MilestoneService {
       include: {
         video: {
           include: {
-            videoGroup: true
+            videoGroup: {
+              include: {
+                lesson: true
+              }
+            }
           }
         }
       }
@@ -248,53 +273,35 @@ export class MilestoneService {
       throw new Error('Milestone not found')
     }
 
-    // Check permissions - only video uploader, group creator, or admin can add questions
+    // Check permissions - only video uploader, lesson creator, or admin can add questions
     if (
       milestone.video.uploadedBy !== user.id && 
-      milestone.video.videoGroup.createdBy !== user.id && 
+      milestone.video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
       throw new Error('Access denied')
     }
 
-    // Create question with transaction to ensure consistency
-    const result = await prisma.$transaction(async (tx) => {
-      // Create the question
-      const question = await tx.question.create({
-        data: {
-          milestoneId: data.milestoneId,
-          type: data.type,
-          question: data.question,
-          correctAnswer: data.correctAnswer,
-          explanation: data.explanation
-        }
-      })
-
-      // Create options for multiple choice questions
-      if (data.type === 'MULTIPLE_CHOICE' && data.options.length > 0) {
-        const optionData = data.options.map((option, index) => ({
-          questionId: question.id,
-          text: option,
-          isCorrect: option === data.correctAnswer,
-          order: index + 1
-        }))
-
-        await tx.questionOption.createMany({
-          data: optionData
-        })
+    // Create question
+    const question = await prisma.question.create({
+      data: {
+        milestoneId: data.milestoneId,
+        type: data.type,
+        text: data.text,
+        explanation: data.explanation || null,
+        hints: data.hints || [],
+        difficulty: data.difficulty || null,
+        questionData: data.questionData,
+        points: data.points || 1,
+        passThreshold: data.passThreshold || 0.7,
+        createdById: user.id,
+        status: 'DRAFT' // Default to draft status for manual creation
+      },
+      include: {
+        questionData: true
       }
-
-      // Return question with options
-      return await tx.question.findUnique({
-        where: { id: question.id },
-        include: {
-          options: {
-            orderBy: { order: 'asc' }
-          }
-        }
-      })
     })
 
-    return result
+    return question
   }
 }

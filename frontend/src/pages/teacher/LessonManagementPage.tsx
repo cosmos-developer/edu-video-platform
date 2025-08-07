@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { videoService } from '../../services/video'
+import { lessonService } from '../../services/lesson'
 import type { VideoGroup, Video, Milestone } from '../../services/video'
+import type { Lesson } from '../../services/lesson'
 import { useAuth } from '../../hooks/useAuth'
-import { VideoUploadModal } from '../../components/teacher/VideoUploadModal'
+import { VideoUploadForm } from '../../components/teacher/VideoUploadForm'
 import { MilestoneEditor } from '../../components/teacher/MilestoneEditor'
 import { QuestionEditor } from '../../components/teacher/QuestionEditor'
 import { AIQuestionGenerator } from '../../components/teacher/AIQuestionGenerator'
@@ -13,7 +15,8 @@ export default function LessonManagementPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   
-  const [lesson, setLesson] = useState<VideoGroup | null>(null)
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [videoGroups, setVideoGroups] = useState<VideoGroup[]>([])
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,14 +57,19 @@ export default function LessonManagementPage() {
     setError(null)
 
     try {
-      const response = await videoService.getVideoGroup(lessonId)
+      const lessonData = await lessonService.getLesson(lessonId)
+      
       // Check if user owns this lesson or is admin
-      const lessonData = response
-      if (lessonData.createdBy !== user?.id && user?.role !== 'ADMIN') {
+      if (lessonData.createdById !== user?.id && user?.role !== 'ADMIN') {
         throw new Error('You do not have permission to manage this lesson')
       }
 
       setLesson(lessonData)
+      
+      // If lesson has video groups, we can set them (from API response or fetch separately)
+      if ('videoGroups' in lessonData) {
+        setVideoGroups((lessonData as any).videoGroups || [])
+      }
     } catch (err: any) {
       console.error('Error loading lesson:', err)
       setError(err.message || 'Failed to load lesson')
@@ -71,10 +79,8 @@ export default function LessonManagementPage() {
   }
 
   const handleVideoAdded = (video: Video) => {
-    setLesson(prev => prev ? {
-      ...prev,
-      videos: [...(prev.videos || []), video]
-    } : null)
+    // For now, we'll refresh the lesson data to get updated video groups
+    loadLesson()
     setShowVideoUpload(false)
   }
 
@@ -112,8 +118,9 @@ export default function LessonManagementPage() {
   }
 
   const handlePreviewLesson = () => {
-    if (lesson?.videos && lesson.videos.length > 0) {
-      navigate(`/video/${lesson.videos[0].id}`)
+    const allVideos = videoGroups.flatMap(group => group.videos || [])
+    if (allVideos.length > 0) {
+      navigate(`/video/${allVideos[0].id}`)
     }
   }
 
@@ -176,9 +183,9 @@ export default function LessonManagementPage() {
           <div className="flex space-x-3">
             <button
               onClick={handlePreviewLesson}
-              disabled={!lesson.videos || lesson.videos.length === 0}
+              disabled={videoGroups.flatMap(g => g.videos || []).length === 0}
               className={`btn-secondary ${
-                !lesson.videos || lesson.videos.length === 0 
+                videoGroups.flatMap(g => g.videos || []).length === 0
                   ? 'opacity-50 cursor-not-allowed' 
                   : ''
               }`}
@@ -201,9 +208,9 @@ export default function LessonManagementPage() {
           <div className="card">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Videos</h2>
             
-            {lesson.videos && lesson.videos.length > 0 ? (
+            {videoGroups.flatMap(g => g.videos || []).length > 0 ? (
               <div className="space-y-3">
-                {lesson.videos.map((video, index) => (
+                {videoGroups.flatMap(g => g.videos || []).map((video, index) => (
                   <div
                     key={video.id}
                     onClick={() => handleVideoSelect(video)}
@@ -394,9 +401,9 @@ export default function LessonManagementPage() {
 
       {/* Modals */}
       {showVideoUpload && lessonId && (
-        <VideoUploadModal
-          lessonId={lessonId}
-          onVideoAdded={handleVideoAdded}
+        <VideoUploadForm
+          groupId={lessonId}
+          onVideoUploaded={handleVideoAdded}
           onClose={() => setShowVideoUpload(false)}
         />
       )}

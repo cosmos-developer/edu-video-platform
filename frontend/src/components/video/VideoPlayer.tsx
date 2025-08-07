@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Video, VideoSession, Milestone } from '../../services/video'
+import { videoService } from '../../services/video'
 import { QuestionOverlay } from './QuestionOverlay'
 import { MilestoneMarkers } from './MilestoneMarkers'
 import { VideoControls } from './VideoControls'
@@ -323,9 +324,10 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         className="w-full h-auto"
-        src={video.videoUrl}
-        poster={video.thumbnailUrl || undefined}
+        src={videoService.getStreamingUrl(video.id)}
+        poster={video.thumbnailUrl ? videoService.getThumbnailUrl(video.id) : undefined}
         playsInline
+        crossOrigin="anonymous"
       />
 
       {/* Milestone Markers */}

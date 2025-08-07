@@ -151,8 +151,8 @@ export const lessonController = {
                   order: true,
                   status: true,
                   duration: true,
-                  thumbnailUrl: true,
-                  gcsUrl: true,
+                  thumbnailPath: true,
+                  filePath: true,
                   _count: {
                     select: {
                       milestones: true

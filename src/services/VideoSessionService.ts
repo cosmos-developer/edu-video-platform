@@ -32,21 +32,18 @@ export class VideoSessionService {
       where: {
         id: videoId,
         videoGroup: {
-          OR: [
-            // Note: VideoGroup doesn't have isPublic field
-            // Note: VideoGroup doesn't have createdBy field
-            {
-              videos: {
-                some: {
-                  studentSessions: {
-                    some: {
-                      studentId: studentId
-                    }
+          lesson: {
+            OR: [
+              { createdById: studentId },
+              {
+                studentProgress: {
+                  some: {
+                    studentId: studentId
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       }
     })
@@ -60,14 +57,6 @@ export class VideoSessionService {
       where: {
         videoId,
         studentId
-      },
-      include: {
-
-        questionAttempts: {
-          include: {
-            question: true
-          }
-        }
       }
     })
 
@@ -80,10 +69,11 @@ export class VideoSessionService {
           lastSeenAt: new Date()
         },
         include: {
-          // Note: StudentSession doesn't have milestoneProgress relation
-          questionAttempts: {
+          video: {
             include: {
-              question: true
+              milestones: {
+                orderBy: { timestamp: 'asc' }
+              }
             }
           }
         }
@@ -98,10 +88,11 @@ export class VideoSessionService {
           status: 'ACTIVE'
         },
         include: {
-          // Note: StudentSession doesn't have milestoneProgress relation
-          questionAttempts: {
+          video: {
             include: {
-              question: true
+              milestones: {
+                orderBy: { timestamp: 'asc' }
+              }
             }
           }
         }
@@ -140,10 +131,11 @@ export class VideoSessionService {
       where: { id: sessionId },
       data: updateData,
       include: {
-
-        questionAttempts: {
+        video: {
           include: {
-            question: true
+            milestones: {
+              orderBy: { timestamp: 'asc' }
+            }
           }
         }
       }
@@ -226,16 +218,55 @@ export class VideoSessionService {
 
     // Check if answer is correct
     let isCorrect = false
+    let score = 0
     const questionData = question.questionData as any
+    
     if (question.type === 'MULTIPLE_CHOICE') {
-      const correctOption = questionData.options?.find((opt: any) => opt.isCorrect)
-      isCorrect = correctOption?.text === data.answer
+      const answerIndex = parseInt(data.answer)
+      isCorrect = answerIndex === questionData.correctAnswerIndex
+      score = isCorrect ? 1 : 0
     } else if (question.type === 'TRUE_FALSE') {
-      isCorrect = questionData.correctAnswer === (data.answer.toLowerCase() === 'true')
+      const answerBool = data.answer.toLowerCase() === 'true'
+      isCorrect = questionData.correctAnswer === answerBool
+      score = isCorrect ? 1 : 0
     } else if (question.type === 'SHORT_ANSWER') {
-      // For short answer, we'll do a case-insensitive comparison
-      // In a real app, you might want more sophisticated matching
-      isCorrect = questionData.correctAnswer?.toLowerCase() === data.answer.toLowerCase()
+      const correctAnswers = questionData.correctAnswers || []
+      const caseSensitive = questionData.caseSensitive || false
+      const studentAnswer = caseSensitive ? data.answer : data.answer.toLowerCase()
+      
+      isCorrect = correctAnswers.some((correct: string) => {
+        const correctAnswer = caseSensitive ? correct : correct.toLowerCase()
+        return correctAnswer === studentAnswer
+      })
+      score = isCorrect ? 1 : 0
+    } else if (question.type === 'FILL_IN_BLANK') {
+      // For fill in blank, we'll expect the answer to be a JSON array
+      try {
+        const answers = JSON.parse(data.answer)
+        const blanks = questionData.blanks || []
+        let correctBlanks = 0
+        
+        answers.forEach((answer: string, index: number) => {
+          if (blanks[index]) {
+            const acceptedAnswers = blanks[index].acceptedAnswers || []
+            const caseSensitive = blanks[index].caseSensitive || false
+            const studentAnswer = caseSensitive ? answer : answer.toLowerCase()
+            
+            const isBlankCorrect = acceptedAnswers.some((accepted: string) => {
+              const acceptedAnswer = caseSensitive ? accepted : accepted.toLowerCase()
+              return acceptedAnswer === studentAnswer
+            })
+            
+            if (isBlankCorrect) correctBlanks++
+          }
+        })
+        
+        score = correctBlanks / blanks.length
+        isCorrect = score >= 0.7 // 70% threshold for fill in blank
+      } catch {
+        isCorrect = false
+        score = 0
+      }
     }
 
     // Check if answer already exists
@@ -251,8 +282,10 @@ export class VideoSessionService {
       questionAnswer = await prisma.questionAttempt.update({
         where: { id: questionAnswer.id },
         data: {
-          studentAnswer: data.answer,
+          studentAnswer: { answer: data.answer }, // Store as JSON
           isCorrect,
+          score: score,
+          status: isCorrect ? 'CORRECT' : 'INCORRECT',
           submittedAt: new Date(),
           attemptNumber: questionAnswer.attemptNumber + 1
         }
@@ -263,18 +296,27 @@ export class VideoSessionService {
         data: {
           studentId,
           questionId: data.questionId,
-          studentAnswer: data.answer,
+          studentAnswer: { answer: data.answer }, // Store as JSON
           isCorrect,
+          score: score,
+          status: isCorrect ? 'CORRECT' : 'INCORRECT',
           submittedAt: new Date(),
           attemptNumber: 1
         }
       })
     }
 
+    // Get question details for response
+    const fullQuestion = await prisma.question.findUnique({
+      where: { id: data.questionId },
+      select: { explanation: true }
+    })
+
     return {
       answer: questionAnswer,
       isCorrect,
-      explanation: question.explanation
+      score,
+      explanation: fullQuestion?.explanation
     }
   }
 
@@ -302,10 +344,11 @@ export class VideoSessionService {
         lastSeenAt: new Date()
       },
       include: {
-
-        questionAttempts: {
+        video: {
           include: {
-            question: true
+            milestones: {
+              orderBy: { timestamp: 'asc' }
+            }
           }
         }
       }
@@ -320,21 +363,18 @@ export class VideoSessionService {
       where: {
         id: videoId,
         videoGroup: {
-          OR: [
-            // Note: VideoGroup doesn't have isPublic field
-            // Note: VideoGroup doesn't have createdBy field
-            {
-              videos: {
-                some: {
-                  studentSessions: {
-                    some: {
-                      studentId: studentId
-                    }
+          lesson: {
+            OR: [
+              { createdById: studentId },
+              {
+                studentProgress: {
+                  some: {
+                    studentId: studentId
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       }
     })
@@ -350,11 +390,21 @@ export class VideoSessionService {
         studentId
       },
       include: {
-
-        questionAttempts: {
+        video: {
           include: {
-            question: {
-              select: { id: true, type: true, text: true, questionData: true }
+            milestones: {
+              orderBy: { timestamp: 'asc' },
+              include: {
+                questions: {
+                  select: { 
+                    id: true, 
+                    type: true, 
+                    text: true, 
+                    questionData: true,
+                    status: true
+                  }
+                }
+              }
             }
           }
         }
@@ -391,11 +441,7 @@ export class VideoSessionService {
               }
             }
           },
-          _count: {
-            select: {
-              questionAttempts: true
-            }
-          }
+          // Remove _count from StudentSessionInclude as it's not supported
         },
         orderBy: { lastSeenAt: 'desc' },
         skip: offset,

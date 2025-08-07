@@ -22,7 +22,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Log database queries in development
 if (process.env.NODE_ENV === 'development') {
-  prisma.$on('query', (e: any) => {
+  prisma.$on('query' as never, (e: any) => {
     logger.debug('Database Query', {
       query: e.query,
       params: e.params,

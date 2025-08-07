@@ -189,6 +189,46 @@ export const videoService = {
     return response.data
   },
 
+  // Upload video file with progress tracking
+  async uploadVideoFile(groupId: string, file: File, data: {
+    title: string
+    description?: string
+  }, onProgress?: (progress: number) => void) {
+    const formData = new FormData()
+    formData.append('video', file)
+    formData.append('title', data.title)
+    if (data.description) {
+      formData.append('description', data.description)
+    }
+
+    const response = await apiService.post<ApiResponse<Video>>(
+      `/videos/groups/${groupId}/videos`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            onProgress(progress)
+          }
+        }
+      }
+    )
+    return response.data
+  },
+
+  // Get video streaming URL
+  getStreamingUrl(videoId: string) {
+    return `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/videos/${videoId}/stream`
+  },
+
+  // Get video thumbnail URL
+  getThumbnailUrl(videoId: string) {
+    return `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/videos/${videoId}/thumbnail`
+  },
+
   // Get specific video
   async getVideo(videoId: string) {
     const response = await apiService.get<ApiResponse<Video>>(`/videos/${videoId}`)
@@ -210,6 +250,46 @@ export const videoService = {
   // Delete video
   async deleteVideo(videoId: string) {
     const response = await apiService.delete<ApiResponse<{ message: string }>>(`/videos/${videoId}`)
+    return response.data
+  }
+}
+
+// Question API
+export const questionService = {
+  // Create question
+  async createQuestion(data: {
+    milestoneId: string
+    type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER'
+    question: string
+    correctAnswer: string
+    explanation?: string
+    options?: string[]
+  }) {
+    const response = await apiService.post<ApiResponse<Question>>('/questions', data)
+    return response.data
+  },
+
+  // Get questions for milestone
+  async getQuestionsByMilestone(milestoneId: string) {
+    const response = await apiService.get<ApiResponse<Question[]>>(`/questions/milestone/${milestoneId}`)
+    return response.data
+  },
+
+  // Update question
+  async updateQuestion(questionId: string, data: {
+    type?: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER'
+    question?: string
+    correctAnswer?: string
+    explanation?: string
+    options?: string[]
+  }) {
+    const response = await apiService.put<ApiResponse<Question>>(`/questions/${questionId}`, data)
+    return response.data
+  },
+
+  // Delete question
+  async deleteQuestion(questionId: string) {
+    const response = await apiService.delete<ApiResponse<{ message: string }>>(`/questions/${questionId}`)
     return response.data
   }
 }

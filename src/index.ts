@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 
 // Import configurations
 import { environment } from './config/environment';
-import { connectDatabase } from './config/database';
+import { prisma } from './config/database';
 import { logger } from './utils/logger';
 
 // Import middleware
@@ -92,7 +92,7 @@ const gracefulShutdown = async (signal: string) => {
     logger.info('HTTP server closed');
     
     // Close database connections
-    connectDatabase.disconnect();
+    prisma.$disconnect();
     
     // Close Socket.IO server
     io.close(() => {

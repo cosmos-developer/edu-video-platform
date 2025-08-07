@@ -1,6 +1,7 @@
 import { Router } from 'express'
-import { body, param } from 'express-validator'
+import { body } from 'express-validator'
 import { validationResult } from 'express-validator'
+import { validateCUIDParam } from '../utils/validators'
 import { authenticate } from '../middleware/auth/authMiddleware'
 // import { roleMiddleware } from '../middleware/role' // TODO: Create this middleware
 import { AIQuestionService } from '../services/AIQuestionService'
@@ -14,7 +15,7 @@ router.use(authenticate)
 // GET /api/ai/providers - Get available AI providers
 router.get('/providers', 
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  (req: AuthenticatedRequest, res) => {
+  (_req: AuthenticatedRequest, res) => {
     try {
       const providers = AIQuestionService.getAvailableProviders()
       res.json({
@@ -90,7 +91,7 @@ router.post('/generate-questions',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to generate questions',
         message: error.message || 'An unexpected error occurred'
@@ -102,7 +103,7 @@ router.post('/generate-questions',
 // POST /api/ai/generate-for-milestone/:milestoneId - Generate questions for existing milestone
 router.post('/generate-for-milestone/:milestoneId',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  param('milestoneId').isUUID().withMessage('Invalid milestone ID'),
+  validateCUIDParam('milestoneId', 'Invalid milestone ID'),
   body('content').optional().trim(),
   body('questionCount').optional().isInt({ min: 1, max: 10 }).withMessage('Question count must be between 1 and 10'),
   body('questionTypes').optional().isArray().withMessage('Question types must be an array'),
@@ -150,7 +151,7 @@ router.post('/generate-for-milestone/:milestoneId',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to generate questions for milestone',
         message: error.message || 'An unexpected error occurred'
@@ -162,7 +163,7 @@ router.post('/generate-for-milestone/:milestoneId',
 // POST /api/ai/generate-milestone-with-questions/:videoId - Generate milestone and questions from content
 router.post('/generate-milestone-with-questions/:videoId',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  param('videoId').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('videoId', 'Invalid video ID'),
   body('videoTitle').notEmpty().trim().withMessage('Video title is required'),
   body('content').notEmpty().trim().withMessage('Content is required'),
   body('questionCount').optional().isInt({ min: 1, max: 10 }).withMessage('Question count must be between 1 and 10'),
@@ -206,7 +207,7 @@ router.post('/generate-milestone-with-questions/:videoId',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to generate milestone with questions',
         message: error.message || 'An unexpected error occurred'

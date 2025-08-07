@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { milestoneService } from '../../services/video'
+import React, { useState, useEffect } from 'react'
+import { milestoneService, questionService } from '../../services/video'
 import type { Milestone, Question } from '../../services/video'
 
 interface QuestionEditorProps {
@@ -10,8 +10,10 @@ interface QuestionEditorProps {
 export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
   const [questions, setQuestions] = useState<Question[]>(milestone.questions || [])
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [previewAnswer, setPreviewAnswer] = useState('')
 
   const [formData, setFormData] = useState({
     type: 'MULTIPLE_CHOICE' as 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER',
@@ -85,14 +87,15 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
     setError(null)
 
     try {
-      const response = await milestoneService.addQuestion(milestone.id, {
+      const response = await questionService.createQuestion({
+        milestoneId: milestone.id,
         type: formData.type,
         question: formData.question,
         explanation: formData.explanation || undefined,
         correctAnswer: formData.correctAnswer,
         options: formData.type === 'MULTIPLE_CHOICE' 
           ? formData.options.filter(opt => opt.trim())
-          : []
+          : undefined
       })
 
       setQuestions(prev => [...prev, response])
@@ -252,7 +255,142 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
                     </div>
                   )}
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Preview Toggle */}
+                  <div className="flex items-center space-x-2 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview(false)}
+                      className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                        !showPreview 
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview(true)}
+                      className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                        showPreview 
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      disabled={!formData.question.trim()}
+                    >
+                      Preview
+                    </button>
+                  </div>
+
+                  {showPreview ? (
+                    /* Question Preview */
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-4">
+                        Preview: How students will see this question
+                      </h4>
+                      
+                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                        <h5 className="font-medium text-gray-900 mb-3">
+                          {formData.question || 'Enter your question...'}
+                        </h5>
+                        
+                        {formData.type === 'MULTIPLE_CHOICE' && (
+                          <div className="space-y-2">
+                            {formData.options.filter(opt => opt.trim()).map((option, index) => (
+                              <label key={index} className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="preview-answer"
+                                  value={option}
+                                  checked={previewAnswer === option}
+                                  onChange={(e) => setPreviewAnswer(e.target.value)}
+                                  className="text-blue-600"
+                                />
+                                <span className="text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {formData.type === 'TRUE_FALSE' && (
+                          <div className="space-y-2">
+                            {['True', 'False'].map((option) => (
+                              <label key={option} className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="preview-answer"
+                                  value={option}
+                                  checked={previewAnswer === option}
+                                  onChange={(e) => setPreviewAnswer(e.target.value)}
+                                  className="text-blue-600"
+                                />
+                                <span className="text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {formData.type === 'SHORT_ANSWER' && (
+                          <input
+                            type="text"
+                            value={previewAnswer}
+                            onChange={(e) => setPreviewAnswer(e.target.value)}
+                            placeholder="Student will type their answer here..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                        )}
+                        
+                        {/* Show feedback */}
+                        {previewAnswer && (
+                          <div className={`mt-3 p-3 rounded-md ${
+                            previewAnswer === formData.correctAnswer
+                              ? 'bg-green-50 border border-green-200'
+                              : 'bg-red-50 border border-red-200'
+                          }`}>
+                            <div className="flex items-center space-x-2">
+                              {previewAnswer === formData.correctAnswer ? (
+                                <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L10 10.414l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                              <span className={`font-medium ${
+                                previewAnswer === formData.correctAnswer ? 'text-green-700' : 'text-red-700'
+                              }`}>
+                                {previewAnswer === formData.correctAnswer ? 'Correct!' : 'Incorrect'}
+                              </span>
+                            </div>
+                            {formData.explanation && (
+                              <p className={`mt-2 text-sm ${
+                                previewAnswer === formData.correctAnswer ? 'text-green-700' : 'text-red-700'
+                              }`}>
+                                {formData.explanation}
+                              </p>
+                            )}
+                            {previewAnswer !== formData.correctAnswer && (
+                              <p className="mt-2 text-sm text-red-700">
+                                Correct answer: {formData.correctAnswer}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex justify-end space-x-2 mt-4">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewAnswer('')}
+                          className="text-sm px-3 py-1 text-gray-500 hover:text-gray-700"
+                        >
+                          Clear Answer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Question Type */}
                     <div>
                       <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
@@ -390,6 +528,7 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
                       </button>
                     </div>
                   </form>
+                  )}
                 </div>
               )}
             </div>

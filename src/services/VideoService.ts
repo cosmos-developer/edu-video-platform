@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import { User } from '../types/auth'
+import { VideoProcessingService } from './VideoProcessingService'
+import { getVideoFilePath, getThumbnailFilePath, deleteVideoFile, deleteThumbnailFile } from '../middleware/upload/videoUploadMiddleware'
+import path from 'path'
 
 const prisma = new PrismaClient()
 
@@ -21,19 +24,23 @@ interface UpdateVideoGroupData {
 interface CreateVideoData {
   title: string
   description: string | null
-  videoUrl: string
-  duration: number | null
-  thumbnailUrl: string | null
   videoGroupId: string
-  uploadedBy: string
+  // uploadedBy field removed - using uploadedAt timestamp instead
+  // File upload data
+  filename?: string
+  originalName?: string
+  filePath?: string
+  mimeType?: string
 }
 
 interface UpdateVideoData {
   title?: string
   description?: string
-  videoUrl?: string
+  filename?: string
+  filePath?: string
+  mimeType?: string
   duration?: number
-  thumbnailUrl?: string
+  thumbnailPath?: string
 }
 
 interface GetVideoGroupsOptions {
@@ -51,30 +58,26 @@ export class VideoService {
     // Build where clause for search and access control
     const whereClause = {
       AND: [
-        // Public videos OR created by user OR user has access through enrollment
+        // Access control through lesson relationship
         {
-          OR: [
-            { isPublic: true },
-            { createdBy: userId },
-            {
-              videos: {
-                some: {
-                  studentSessions: {
-                    some: {
-                      userId: userId
-                    }
+          lesson: {
+            OR: [
+              { createdById: userId },
+              {
+                studentProgress: {
+                  some: {
+                    studentId: userId
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         },
         // Search filter
         search ? {
           OR: [
-            { title: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-            { tags: { hasSome: [search] } }
+            { title: { contains: search, mode: 'insensitive' as any } },
+            { description: { contains: search, mode: 'insensitive' as any } }
           ]
         } : {}
       ]
@@ -90,6 +93,13 @@ export class VideoService {
               _count: {
                 select: { milestones: true }
               }
+            }
+          },
+          lesson: {
+            select: {
+              id: true,
+              title: true,
+              createdById: true
             }
           },
           _count: {
@@ -113,21 +123,18 @@ export class VideoService {
     const videoGroup = await prisma.videoGroup.findFirst({
       where: {
         id: groupId,
-        OR: [
-          // Note: VideoGroup schema doesn't have isPublic or createdBy fields
-          // These conditions need to be evaluated at the lesson level
-          {
-            videos: {
-              some: {
-                studentSessions: {
-                  some: {
-                    userId: userId
-                  }
+        lesson: {
+          OR: [
+            { createdById: userId },
+            {
+              studentProgress: {
+                some: {
+                  studentId: userId
                 }
               }
             }
-          }
-        ]
+          ]
+        }
       },
       include: {
         videos: {
@@ -138,7 +145,7 @@ export class VideoService {
               include: {
                 questions: {
                   include: {
-                    questionData: true
+                    question: true
                   }
                 }
               }
@@ -151,12 +158,16 @@ export class VideoService {
             }
           }
         },
-        creator: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
+        lesson: {
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
           }
         }
       }
@@ -165,16 +176,31 @@ export class VideoService {
     return videoGroup
   }
 
-  static async createVideoGroup(data: CreateVideoGroupData) {
+  static async createVideoGroup(data: CreateVideoGroupData, lessonId: string) {
+    // Get the next order number for this lesson
+    const maxOrder = await prisma.videoGroup.aggregate({
+      where: { lessonId },
+      _max: { order: true }
+    })
+
+    const nextOrder = (maxOrder._max.order || 0) + 1
+
     const videoGroup = await prisma.videoGroup.create({
       data: {
         title: data.title,
         description: data.description,
-        // Note: tags, isPublic, createdBy removed as they don't exist in VideoGroup schema
+        lessonId,
+        order: nextOrder
       },
       include: {
         videos: {
           orderBy: { order: 'asc' }
+        },
+        lesson: {
+          select: {
+            id: true,
+            title: true
+          }
         },
         _count: {
           select: { videos: true }
@@ -188,22 +214,25 @@ export class VideoService {
   static async updateVideoGroup(groupId: string, data: UpdateVideoGroupData, user: User) {
     // Check if video group exists and user has permission
     const existingGroup = await prisma.videoGroup.findUnique({
-      where: { id: groupId }
+      where: { id: groupId },
+      include: {
+        lesson: true
+      }
     })
 
     if (!existingGroup) {
       throw new Error('Video group not found')
     }
 
-    // Note: VideoGroup doesn't have createdBy field
-    // Permission check would need to be done via lesson.createdBy
-    // For now, allowing all authenticated users to update
+    // Check permissions - only lesson creator or admin can update
+    if (existingGroup.lesson.createdById !== user.id && user.role !== 'ADMIN') {
+      throw new Error('Access denied')
+    }
 
     // Filter out undefined values
     const updateData: any = {}
     if (data.title !== undefined) updateData.title = data.title
     if (data.description !== undefined) updateData.description = data.description
-    // Note: tags and isPublic fields removed as they don't exist in VideoGroup schema
 
     const videoGroup = await prisma.videoGroup.update({
       where: { id: groupId },
@@ -211,6 +240,12 @@ export class VideoService {
       include: {
         videos: {
           orderBy: { order: 'asc' }
+        },
+        lesson: {
+          select: {
+            id: true,
+            title: true
+          }
         },
         _count: {
           select: { videos: true }
@@ -224,15 +259,18 @@ export class VideoService {
   static async createVideo(data: CreateVideoData, user: User) {
     // Check if video group exists and user has permission
     const videoGroup = await prisma.videoGroup.findUnique({
-      where: { id: data.videoGroupId }
+      where: { id: data.videoGroupId },
+      include: {
+        lesson: true
+      }
     })
 
     if (!videoGroup) {
       throw new Error('Video group not found')
     }
 
-    // Check permissions - only creator or admin can add videos
-    if (videoGroup.createdBy !== user.id && user.role !== 'ADMIN') {
+    // Check permissions - only lesson creator or admin can add videos
+    if (videoGroup.lesson.createdById !== user.id && user.role !== 'ADMIN') {
       throw new Error('Access denied')
     }
 
@@ -244,16 +282,55 @@ export class VideoService {
 
     const nextOrder = (maxOrder._max.order || 0) + 1
 
+    // Process video file if provided
+    let videoMetadata = null
+    let thumbnailPath = null
+    let fileSize: bigint = BigInt(0)
+
+    if (data.filename && data.filePath) {
+      const fullPath = getVideoFilePath(data.filename)
+      
+      // Validate file exists
+      const fileExists = await VideoProcessingService.validateVideoFile(fullPath)
+      if (!fileExists) {
+        throw new Error('Video file not found after upload')
+      }
+
+      // Get file size
+      const size = await VideoProcessingService.getFileSize(fullPath)
+      fileSize = BigInt(size)
+
+      // Get video metadata
+      videoMetadata = await VideoProcessingService.getVideoMetadata(fullPath)
+
+      // Generate thumbnail
+      const thumbnailFilename = await VideoProcessingService.generateThumbnail(fullPath, data.filename)
+      if (thumbnailFilename) {
+        thumbnailPath = thumbnailFilename
+      }
+    }
+
     const video = await prisma.video.create({
       data: {
         title: data.title,
         description: data.description,
-        gcsUrl: data.videoUrl, // Map videoUrl to gcsUrl field
-        duration: data.duration,
-        thumbnailUrl: data.thumbnailUrl,
+        filePath: data.filePath || null,
+        fileName: data.originalName || data.filename || null,
+        duration: videoMetadata?.duration ? Math.round(videoMetadata.duration) : null,
+        size: fileSize || null,
+        mimeType: data.mimeType || null,
+        thumbnailPath: thumbnailPath,
+        metadata: videoMetadata ? {
+          width: videoMetadata.width,
+          height: videoMetadata.height,
+          bitrate: videoMetadata.bitrate,
+          fps: videoMetadata.fps,
+          codec: videoMetadata.codec
+        } : undefined,
         videoGroupId: data.videoGroupId,
-        uploadedBy: data.uploadedBy,
-        order: nextOrder
+        uploadedAt: new Date(),
+        order: nextOrder,
+        status: 'READY' // Set to READY for local files
       },
       include: {
         milestones: {
@@ -261,7 +338,7 @@ export class VideoService {
           include: {
             questions: {
               include: {
-                questionData: true
+                question: true
               }
             }
           }
@@ -283,21 +360,18 @@ export class VideoService {
       where: {
         id: videoId,
         videoGroup: {
-          OR: [
-            { isPublic: true },
-            { createdBy: userId },
-            {
-              videos: {
-                some: {
-                  studentSessions: {
-                    some: {
-                      userId: userId
-                    }
+          lesson: {
+            OR: [
+              { createdById: userId },
+              {
+                studentProgress: {
+                  some: {
+                    studentId: userId
                   }
                 }
               }
-            }
-          ]
+            ]
+          }
         }
       },
       include: {
@@ -306,25 +380,25 @@ export class VideoService {
           include: {
             questions: {
               include: {
-                questionData: true
+                question: true
               }
             }
           }
         },
         videoGroup: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            createdBy: true
-          }
-        },
-        uploader: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
+          include: {
+            lesson: {
+              include: {
+                createdBy: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true
+                  }
+                }
+              }
+            }
           }
         },
         _count: {
@@ -344,7 +418,11 @@ export class VideoService {
     const existingVideo = await prisma.video.findUnique({
       where: { id: videoId },
       include: {
-        videoGroup: true
+        videoGroup: {
+          include: {
+            lesson: true
+          }
+        }
       }
     })
 
@@ -352,10 +430,9 @@ export class VideoService {
       throw new Error('Video not found')
     }
 
-    // Check permissions - only uploader, group creator, or admin can update
+    // Check permissions - only lesson creator or admin can update
     if (
-      existingVideo.uploadedBy !== user.id && 
-      existingVideo.videoGroup.createdBy !== user.id && 
+      existingVideo.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
       throw new Error('Access denied')
@@ -365,9 +442,10 @@ export class VideoService {
     const updateData: any = {}
     if (data.title !== undefined) updateData.title = data.title
     if (data.description !== undefined) updateData.description = data.description
-    if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl
+    if (data.filePath !== undefined) updateData.filePath = data.filePath
+    if (data.mimeType !== undefined) updateData.mimeType = data.mimeType
     if (data.duration !== undefined) updateData.duration = data.duration
-    if (data.thumbnailUrl !== undefined) updateData.thumbnailUrl = data.thumbnailUrl
+    if (data.thumbnailPath !== undefined) updateData.thumbnailPath = data.thumbnailPath
 
     const video = await prisma.video.update({
       where: { id: videoId },
@@ -378,7 +456,7 @@ export class VideoService {
           include: {
             questions: {
               include: {
-                questionData: true
+                question: true
               }
             }
           }
@@ -407,7 +485,11 @@ export class VideoService {
     const existingVideo = await prisma.video.findUnique({
       where: { id: videoId },
       include: {
-        videoGroup: true
+        videoGroup: {
+          include: {
+            lesson: true
+          }
+        }
       }
     })
 
@@ -415,13 +497,21 @@ export class VideoService {
       throw new Error('Video not found')
     }
 
-    // Check permissions - only uploader, group creator, or admin can delete
+    // Check permissions - only lesson creator or admin can delete
     if (
-      existingVideo.uploadedBy !== user.id && 
-      existingVideo.videoGroup.createdBy !== user.id && 
+      existingVideo.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
       throw new Error('Access denied')
+    }
+
+    // Delete associated files before deleting from database
+    if (existingVideo.fileName) {
+      await deleteVideoFile(existingVideo.fileName)
+    }
+    
+    if (existingVideo.thumbnailPath) {
+      await deleteThumbnailFile(existingVideo.thumbnailPath)
     }
 
     await prisma.video.delete({
@@ -429,5 +519,31 @@ export class VideoService {
     })
 
     return true
+  }
+
+  /**
+   * Get video file serving path for streaming
+   */
+  static async getVideoStreamPath(videoId: string, userId: string): Promise<string | null> {
+    const video = await this.getVideoById(videoId, userId)
+    
+    if (!video || !video.fileName) {
+      return null
+    }
+
+    return getVideoFilePath(video.fileName)
+  }
+
+  /**
+   * Get thumbnail serving path
+   */
+  static async getThumbnailStreamPath(videoId: string, userId: string): Promise<string | null> {
+    const video = await this.getVideoById(videoId, userId)
+    
+    if (!video || !video.thumbnailPath) {
+      return null
+    }
+
+    return getThumbnailFilePath(video.thumbnailPath)
   }
 }

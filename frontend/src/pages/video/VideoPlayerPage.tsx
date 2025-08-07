@@ -11,6 +11,7 @@ export default function VideoPlayerPage() {
   const [session, setSession] = useState<VideoSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!videoId) {
@@ -90,6 +91,14 @@ export default function VideoPlayerPage() {
     })
     
     setSession(response)
+    
+    // Show completion message
+    if (response.status === 'COMPLETED') {
+      setCompletionMessage(`Congratulations! You've completed ${video?.title || 'this video'}.`)
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => setCompletionMessage(null), 5000)
+    }
   }
 
   if (loading) {
@@ -172,6 +181,71 @@ export default function VideoPlayerPage() {
         </div>
       )}
 
+      {/* Completion Message */}
+      {completionMessage && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-6 h-6 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-green-800 font-medium">{completionMessage}</p>
+              <div className="flex items-center space-x-4 mt-2">
+                <button
+                  onClick={() => navigate('/lessons')}
+                  className="text-sm text-green-600 hover:text-green-700 underline"
+                >
+                  Back to Lessons
+                </button>
+                {video?.videoGroup && (
+                  <button
+                    onClick={() => navigate(`/lessons/${video.videoGroup?.id}`)}
+                    className="text-sm text-green-600 hover:text-green-700 underline"
+                  >
+                    Continue Lesson Series
+                  </button>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setCompletionMessage(null)}
+              className="text-green-600 hover:text-green-800"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Learning Progress */}
+      {session && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="card text-center">
+            <div className="text-2xl font-bold text-blue-600">
+              {session.status === 'COMPLETED' ? '100' : Math.round((session.currentTime / (video?.duration || 1)) * 100)}%
+            </div>
+            <div className="text-sm text-gray-600 mt-1">Progress</div>
+          </div>
+          
+          <div className="card text-center">
+            <div className="text-2xl font-bold text-green-600">
+              {session.milestoneProgress?.length || 0}
+            </div>
+            <div className="text-sm text-gray-600 mt-1">Milestones Reached</div>
+          </div>
+          
+          <div className="card text-center">
+            <div className="text-2xl font-bold text-purple-600">
+              {session.questionAnswers?.filter(qa => qa.isCorrect).length || 0}
+              <span className="text-sm text-gray-500">/{session.questionAnswers?.length || 0}</span>
+            </div>
+            <div className="text-sm text-gray-600 mt-1">Correct Answers</div>
+          </div>
+        </div>
+      )}
+
       {/* Interactive Video Player */}
       <VideoPlayer
         video={video}
@@ -182,6 +256,44 @@ export default function VideoPlayerPage() {
         onAnswerSubmit={handleAnswerSubmit}
         onSessionComplete={handleSessionComplete}
       />
+      
+      {/* Related Videos */}
+      {video?.videoGroup && video.videoGroup.videos && video.videoGroup.videos.length > 1 && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">More from this Lesson</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {video.videoGroup.videos
+              .filter(v => v.id !== video.id)
+              .slice(0, 6)
+              .map((relatedVideo) => (
+                <div
+                  key={relatedVideo.id}
+                  onClick={() => navigate(`/video/${relatedVideo.id}`)}
+                  className="card cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <div className="aspect-video bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
+                    {relatedVideo.thumbnailUrl ? (
+                      <img
+                        src={relatedVideo.thumbnailUrl}
+                        alt={relatedVideo.title}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </div>
+                  <h4 className="font-medium text-gray-900 truncate">{relatedVideo.title}</h4>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {relatedVideo.duration ? `${Math.floor(relatedVideo.duration / 60)}:${(relatedVideo.duration % 60).toFixed(0).padStart(2, '0')}` : 'Unknown duration'}
+                  </p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
     </div>
   )
 }

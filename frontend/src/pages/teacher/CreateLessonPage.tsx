@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { videoService } from '../../services/video'
+import { lessonService } from '../../services/lesson'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function CreateLessonPage() {
@@ -13,7 +13,8 @@ export default function CreateLessonPage() {
     title: '',
     description: '',
     tags: [] as string[],
-    isPublic: true
+    difficulty: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
+    estimatedTime: undefined as number | undefined
   })
   const [tagInput, setTagInput] = useState('')
 
@@ -88,15 +89,16 @@ export default function CreateLessonPage() {
     setError(null)
 
     try {
-      const response = await videoService.createVideoGroup({
+      const lesson = await lessonService.createLesson({
         title: formData.title,
         description: formData.description || undefined,
         tags: formData.tags,
-        isPublic: formData.isPublic
+        difficulty: formData.difficulty,
+        estimatedTime: formData.estimatedTime
       })
 
       // Navigate to lesson management page
-      navigate(`/teacher/lessons/${response.id}`)
+      navigate(`/teacher/lessons/${lesson.id}`)
     } catch (err: any) {
       console.error('Error creating lesson:', err)
       setError(err.message || 'Failed to create lesson')

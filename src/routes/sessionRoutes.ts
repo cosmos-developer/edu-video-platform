@@ -1,6 +1,7 @@
 import { Router } from 'express'
-import { body, param, query } from 'express-validator'
+import { body, query } from 'express-validator'
 import { validationResult } from 'express-validator'
+import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
 import { authenticate } from '../middleware/auth/authMiddleware'
 import { VideoSessionService } from '../services/VideoSessionService'
 import { AuthenticatedRequest } from '../middleware/auth/authMiddleware'
@@ -12,7 +13,7 @@ router.use(authenticate)
 
 // POST /api/sessions/start - Start or resume video session
 router.post('/start',
-  body('videoId').isUUID().withMessage('Valid video ID is required'),
+  validateCUIDBody('videoId', 'Valid video ID is required'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -45,7 +46,7 @@ router.post('/start',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to start video session'
       })
@@ -55,7 +56,7 @@ router.post('/start',
 
 // PUT /api/sessions/:sessionId/progress - Update session progress
 router.put('/:sessionId/progress',
-  param('sessionId').isUUID().withMessage('Invalid session ID'),
+  validateCUIDParam('sessionId', 'Invalid session ID'),
   body('currentTime').isInt({ min: 0 }).withMessage('Current time must be a positive integer'),
   body('totalWatchTime').optional().isInt({ min: 0 }).withMessage('Total watch time must be a positive integer'),
   async (req: AuthenticatedRequest, res) => {
@@ -103,7 +104,7 @@ router.put('/:sessionId/progress',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update progress'
       })
@@ -113,8 +114,8 @@ router.put('/:sessionId/progress',
 
 // POST /api/sessions/:sessionId/milestone - Mark milestone as reached
 router.post('/:sessionId/milestone',
-  param('sessionId').isUUID().withMessage('Invalid session ID'),
-  body('milestoneId').isUUID().withMessage('Valid milestone ID is required'),
+  validateCUIDParam('sessionId', 'Invalid session ID'),
+  validateCUIDBody('milestoneId', 'Valid milestone ID is required'),
   body('timestamp').isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
   async (req: AuthenticatedRequest, res) => {
     try {
@@ -164,7 +165,7 @@ router.post('/:sessionId/milestone',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to mark milestone'
       })
@@ -174,10 +175,10 @@ router.post('/:sessionId/milestone',
 
 // POST /api/sessions/:sessionId/question - Submit question answer
 router.post('/:sessionId/question',
-  param('sessionId').isUUID().withMessage('Invalid session ID'),
-  body('questionId').isUUID().withMessage('Valid question ID is required'),
+  validateCUIDParam('sessionId', 'Invalid session ID'),
+  validateCUIDBody('questionId', 'Valid question ID is required'),
   body('answer').notEmpty().trim().withMessage('Answer is required'),
-  body('milestoneId').isUUID().withMessage('Valid milestone ID is required'),
+  validateCUIDBody('milestoneId', 'Valid milestone ID is required'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -231,7 +232,7 @@ router.post('/:sessionId/question',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to submit answer'
       })
@@ -241,7 +242,7 @@ router.post('/:sessionId/question',
 
 // PUT /api/sessions/:sessionId/complete - Mark session as completed
 router.put('/:sessionId/complete',
-  param('sessionId').isUUID().withMessage('Invalid session ID'),
+  validateCUIDParam('sessionId', 'Invalid session ID'),
   body('finalTime').isInt({ min: 0 }).withMessage('Final time must be a positive integer'),
   body('totalWatchTime').isInt({ min: 0 }).withMessage('Total watch time must be a positive integer'),
   async (req: AuthenticatedRequest, res) => {
@@ -289,7 +290,7 @@ router.put('/:sessionId/complete',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to complete session'
       })
@@ -299,7 +300,7 @@ router.put('/:sessionId/complete',
 
 // GET /api/sessions/video/:videoId - Get user's session for a specific video
 router.get('/video/:videoId',
-  param('videoId').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('videoId', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -331,7 +332,7 @@ router.get('/video/:videoId',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch session'
       })
@@ -379,7 +380,7 @@ router.get('/user',
 
     } catch (error) {
       console.error('Error fetching user sessions:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch sessions'
       })

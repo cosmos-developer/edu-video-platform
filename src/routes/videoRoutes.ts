@@ -1,10 +1,15 @@
 import { Router } from 'express'
-import { body, param, query } from 'express-validator'
+import { body, query } from 'express-validator'
 import { validationResult } from 'express-validator'
+import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
 import { authenticate } from '../middleware/auth/authMiddleware'
 // import { roleMiddleware } from '../middleware/role' // TODO: Create this middleware
 import { VideoService } from '../services/VideoService'
 import { AuthenticatedRequest } from '../middleware/auth/authMiddleware'
+import { uploadVideoMiddleware, handleUploadErrors } from '../middleware/upload/videoUploadMiddleware'
+import { VideoProcessingService } from '../services/VideoProcessingService'
+import fs from 'fs'
+import path from 'path'
 
 const router = Router()
 
@@ -61,7 +66,7 @@ router.get('/',
 
 // GET /api/videos/groups/:id - Get specific video group with videos
 router.get('/groups/:id',
-  param('id').isUUID().withMessage('Invalid group ID'),
+  validateCUIDParam('id', 'Invalid group ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -102,8 +107,7 @@ router.post('/groups',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Implement role middleware
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
-  body('tags').optional().isArray().withMessage('Tags must be an array'),
-  body('isPublic').optional().isBoolean().withMessage('isPublic must be boolean'),
+  validateCUIDBody('lessonId', 'Valid lesson ID is required'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -117,13 +121,10 @@ router.post('/groups',
 
       const videoGroupData = {
         title: req.body.title,
-        description: req.body.description || null,
-        tags: req.body.tags || [],
-        isPublic: req.body.isPublic ?? true,
-        createdBy: req.user!.id
+        description: req.body.description || null
       }
 
-      const videoGroup = await VideoService.createVideoGroup(videoGroupData)
+      const videoGroup = await VideoService.createVideoGroup(videoGroupData, req.body.lessonId)
 
       res.status(201).json({
         success: true,
@@ -143,7 +144,7 @@ router.post('/groups',
 
 // PUT /api/videos/groups/:id - Update video group (creator or admin only)
 router.put('/groups/:id',
-  param('id').isUUID().withMessage('Invalid group ID'),
+  validateCUIDParam('id', 'Invalid group ID'),
   body('title').optional().notEmpty().trim().withMessage('Title cannot be empty'),
   body('description').optional().trim(),
   body('tags').optional().isArray().withMessage('Tags must be an array'),
@@ -203,14 +204,13 @@ router.put('/groups/:id',
   }
 )
 
-// POST /api/videos/groups/:groupId/videos - Add video to group (creator or admin only)
+// POST /api/videos/groups/:groupId/videos - Upload video to group (creator or admin only)
 router.post('/groups/:groupId/videos',
-  param('groupId').isUUID().withMessage('Invalid group ID'),
+  uploadVideoMiddleware, // Handle file upload first
+  handleUploadErrors, // Handle upload errors
+  validateCUIDParam('groupId', 'Invalid group ID'),
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
-  body('videoUrl').isURL().withMessage('Valid video URL is required'),
-  body('duration').optional().isInt({ min: 1 }).withMessage('Duration must be a positive integer'),
-  body('thumbnailUrl').optional().isURL().withMessage('Invalid thumbnail URL'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -222,14 +222,23 @@ router.post('/groups/:groupId/videos',
         })
       }
 
+      // Check if file was uploaded
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: 'Video file is required'
+        })
+      }
+
       const videoData = {
         title: req.body.title,
         description: req.body.description || null,
-        videoUrl: req.body.videoUrl,
-        duration: req.body.duration || null,
-        thumbnailUrl: req.body.thumbnailUrl || null,
         videoGroupId: req.params.groupId,
-        uploadedBy: req.user!.id
+        uploadedBy: req.user!.id,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        filePath: req.file.filename, // Store just the filename
+        mimeType: req.file.mimetype
       }
 
       const video = await VideoService.createVideo(videoData, req.user!)
@@ -267,7 +276,7 @@ router.post('/groups/:groupId/videos',
 
 // GET /api/videos/:id - Get specific video with milestones
 router.get('/:id',
-  param('id').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('id', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -303,14 +312,11 @@ router.get('/:id',
   }
 )
 
-// PUT /api/videos/:id - Update video (uploader or admin only)
+// PUT /api/videos/:id - Update video metadata (uploader or admin only)
 router.put('/:id',
-  param('id').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('id', 'Invalid video ID'),
   body('title').optional().notEmpty().trim().withMessage('Title cannot be empty'),
   body('description').optional().trim(),
-  body('videoUrl').optional().isURL().withMessage('Invalid video URL'),
-  body('duration').optional().isInt({ min: 1 }).withMessage('Duration must be a positive integer'),
-  body('thumbnailUrl').optional().isURL().withMessage('Invalid thumbnail URL'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -324,10 +330,7 @@ router.put('/:id',
 
       const updateData = {
         title: req.body.title,
-        description: req.body.description,
-        videoUrl: req.body.videoUrl,
-        duration: req.body.duration,
-        thumbnailUrl: req.body.thumbnailUrl
+        description: req.body.description
       }
 
       const video = await VideoService.updateVideo(
@@ -369,7 +372,7 @@ router.put('/:id',
 
 // DELETE /api/videos/:id - Delete video (uploader or admin only)
 router.delete('/:id',
-  param('id').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('id', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -408,6 +411,123 @@ router.delete('/:id',
       res.status(500).json({
         success: false,
         error: 'Failed to delete video'
+      })
+    }
+  }
+)
+
+// GET /api/videos/:id/stream - Stream video file (authenticated users with access)
+router.get('/:id/stream',
+  validateCUIDParam('id', 'Invalid video ID'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const videoPath = await VideoService.getVideoStreamPath(req.params.id, req.user!.id)
+
+      if (!videoPath) {
+        return res.status(404).json({
+          success: false,
+          error: 'Video not found or access denied'
+        })
+      }
+
+      // Check if file exists
+      if (!fs.existsSync(videoPath)) {
+        return res.status(404).json({
+          success: false,
+          error: 'Video file not found'
+        })
+      }
+
+      const stat = fs.statSync(videoPath)
+      const fileSize = stat.size
+      const range = req.headers.range
+
+      if (range) {
+        // Handle range requests for video streaming
+        const parts = range.replace(/bytes=/, "").split("-")
+        const start = parseInt(parts[0], 10)
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+        const chunkSize = (end - start) + 1
+        const file = fs.createReadStream(videoPath, { start, end })
+
+        const head = {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': 'video/mp4',
+        }
+
+        res.writeHead(206, head)
+        file.pipe(res)
+      } else {
+        // Send entire file
+        const head = {
+          'Content-Length': fileSize,
+          'Content-Type': VideoProcessingService.getMimeType(videoPath),
+        }
+
+        res.writeHead(200, head)
+        fs.createReadStream(videoPath).pipe(res)
+      }
+
+    } catch (error) {
+      console.error('Error streaming video:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to stream video'
+      })
+    }
+  }
+)
+
+// GET /api/videos/:id/thumbnail - Serve video thumbnail (authenticated users with access)
+router.get('/:id/thumbnail',
+  validateCUIDParam('id', 'Invalid video ID'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const thumbnailPath = await VideoService.getThumbnailStreamPath(req.params.id, req.user!.id)
+
+      if (!thumbnailPath) {
+        return res.status(404).json({
+          success: false,
+          error: 'Thumbnail not found or access denied'
+        })
+      }
+
+      // Check if file exists
+      if (!fs.existsSync(thumbnailPath)) {
+        return res.status(404).json({
+          success: false,
+          error: 'Thumbnail file not found'
+        })
+      }
+
+      // Send thumbnail file
+      res.sendFile(path.resolve(thumbnailPath))
+
+    } catch (error) {
+      console.error('Error serving thumbnail:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to serve thumbnail'
       })
     }
   }

@@ -31,7 +31,7 @@ export const requestLogger = (req: RequestWithTiming, res: Response, next: NextF
 
   // Override res.end to log response
   const originalEnd = res.end;
-  res.end = function(chunk?: any, encoding?: any) {
+  res.end = function(chunk?: any, encoding?: any): any {
     const endTime = performance.now();
     const duration = Math.round((endTime - startTime) * 100) / 100; // Round to 2 decimal places
     
@@ -69,8 +69,8 @@ export const requestLogger = (req: RequestWithTiming, res: Response, next: NextF
       });
     }
     
-    // Call original end method
-    originalEnd.call(this, chunk, encoding);
+    // Call original end method and return its result
+    return originalEnd.call(this, chunk, encoding);
   };
 
   next();

@@ -10,9 +10,16 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
+    username?: string;
+    firstName: string;
+    lastName: string;
+    avatar?: string;
     role: UserRole;
     tenantId?: string;
     status: string;
+    lastLoginAt?: Date;
+    emailVerified?: Date;
+    createdAt: Date;
   };
 }
 
@@ -42,10 +49,16 @@ export const authenticate = async (
       select: {
         id: true,
         email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
         role: true,
         status: true,
         tenantId: true,
-        lastLoginAt: true
+        lastLoginAt: true,
+        emailVerified: true,
+        createdAt: true
       }
     });
 
@@ -61,9 +74,16 @@ export const authenticate = async (
     req.user = {
       id: user.id,
       email: user.email,
+      username: user.username || undefined,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar || undefined,
       role: user.role,
       status: user.status.toString(),
-      tenantId: user.tenantId || undefined
+      tenantId: user.tenantId || undefined,
+      lastLoginAt: user.lastLoginAt || undefined,
+      emailVerified: user.emailVerified || undefined,
+      createdAt: user.createdAt
     };
 
     // Log successful authentication
@@ -117,9 +137,16 @@ export const optionalAuthenticate = async (
       select: {
         id: true,
         email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
         role: true,
         status: true,
-        tenantId: true
+        tenantId: true,
+        lastLoginAt: true,
+        emailVerified: true,
+        createdAt: true
       }
     });
 
@@ -127,9 +154,16 @@ export const optionalAuthenticate = async (
       req.user = {
         id: user.id,
         email: user.email,
+        username: user.username || undefined,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatar: user.avatar || undefined,
         role: user.role,
         status: user.status.toString(),
-        tenantId: user.tenantId || undefined
+        tenantId: user.tenantId || undefined,
+        lastLoginAt: user.lastLoginAt || undefined,
+        emailVerified: user.emailVerified || undefined,
+        createdAt: user.createdAt
       };
     }
 

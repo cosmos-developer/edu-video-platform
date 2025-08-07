@@ -55,6 +55,7 @@ model User {
   
   // Relations
   createdLessons     Lesson[]
+  createdQuestions   Question[]
   studentSessions    StudentSession[]
   studentProgress    StudentProgress[]
   questionAttempts   QuestionAttempt[]
@@ -182,6 +183,7 @@ enum VideoStatus {
   PROCESSING
   READY
   ERROR
+  DRAFT
 }
 
 model Video {
@@ -192,16 +194,16 @@ model Video {
   order        Int         // Order within video group
   status       VideoStatus @default(UPLOADING)
   
-  // Google Cloud Storage integration
-  gcsPath      String?  // Path in Google Cloud Storage
-  gcsUrl       String?  // Public URL for streaming
+  // Local file storage (Phase 1)
+  filePath     String?  // Local file system path
+  fileName     String?  // Original file name
   duration     Int?     // Duration in seconds
   size         BigInt?  // File size in bytes
   mimeType     String?
   
   // Video processing metadata
   processingStatus String? // Additional processing info
-  thumbnailUrl     String? // Generated thumbnail
+  thumbnailPath    String? // Local thumbnail file path
   
   // Video metadata (JSONB for flexibility)
   metadata Json? // Resolution, codecs, etc.
@@ -221,7 +223,7 @@ model Video {
   @@index([videoGroupId])
   @@index([status])
   @@index([order])
-  @@index([gcsPath])
+  @@index([filePath])
   
   @@map("videos")
 }
@@ -255,7 +257,7 @@ model Milestone {
 }
 
 // ========================================
-// AI QUESTION MANAGEMENT & WORKFLOW
+// QUESTION MANAGEMENT & WORKFLOW (Phase 1)
 // ========================================
 
 enum QuestionType {
@@ -268,18 +270,16 @@ enum QuestionType {
 }
 
 enum QuestionStatus {
-  AI_GENERATED
-  PENDING_REVIEW
+  DRAFT
   APPROVED
-  REJECTED
-  NEEDS_REVISION
+  ARCHIVED
 }
 
 model Question {
   id          String         @id @default(cuid())
   milestoneId String
   type        QuestionType
-  status      QuestionStatus @default(AI_GENERATED)
+  status      QuestionStatus @default(DRAFT)
   
   // Question content
   text        String         // Main question text
@@ -290,17 +290,12 @@ model Question {
   // Question data (JSONB for flexibility across question types)
   questionData Json          // Stores options, correct answers, etc.
   
-  // AI generation metadata
-  aiModel      String?       // Which AI model generated this
-  aiPrompt     String?       // Prompt used for generation
-  aiConfidence Float?        // AI confidence score
-  aiMetadata   Json?         // Additional AI metadata
-  
   // Scoring configuration
   points       Int    @default(1)
   passThreshold Float @default(0.7) // Minimum score to pass (0.0-1.0)
   
-  // Review workflow
+  // Teacher creation and review workflow
+  createdById  String        // Teacher who created the question
   reviewedById String?
   reviewedAt   DateTime?
   reviewNotes  String?
@@ -311,12 +306,15 @@ model Question {
   
   // Relations
   milestone Milestone         @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  createdBy User             @relation(fields: [createdById], references: [id])
   attempts  QuestionAttempt[]
+  options   QuestionOption[]
   
   // Indexes
   @@index([milestoneId])
   @@index([status])
   @@index([type])
+  @@index([createdById])
   @@index([createdAt])
   
   @@map("questions")
@@ -609,6 +607,33 @@ model AuditLog {
 }
 
 // ========================================
+// QUESTION OPTIONS & AI INTEGRATION
+// ========================================
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+  order      Int     @default(1)
+  
+  // Metadata
+  explanation String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([questionId])
+  @@index([order])
+  
+  @@map("question_options")
+}
+
 // AI API MANAGEMENT
 // ========================================
 

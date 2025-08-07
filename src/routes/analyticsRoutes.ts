@@ -1,6 +1,7 @@
 import { Router } from 'express'
-import { param, query } from 'express-validator'
+import { query } from 'express-validator'
 import { validationResult } from 'express-validator'
+import { validateCUIDParam, validateCUIDQuery } from '../utils/validators'
 import { authenticate } from '../middleware/auth/authMiddleware'
 // import { roleMiddleware } from '../middleware/role' // TODO: Create this middleware
 import { AnalyticsService } from '../services/AnalyticsService'
@@ -13,7 +14,7 @@ router.use(authenticate)
 
 // GET /api/analytics/video/:videoId/stats - Get video analytics stats
 router.get('/video/:videoId/stats',
-  param('videoId').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('videoId', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -49,7 +50,7 @@ router.get('/video/:videoId/stats',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch video statistics'
       })
@@ -59,7 +60,7 @@ router.get('/video/:videoId/stats',
 
 // GET /api/analytics/video/:videoId/progress - Get video progress data
 router.get('/video/:videoId/progress',
-  param('videoId').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('videoId', 'Invalid video ID'),
   query('timeRange').optional().isIn(['day', 'week', 'month', 'all']).withMessage('Invalid time range'),
   async (req: AuthenticatedRequest, res) => {
     try {
@@ -94,7 +95,7 @@ router.get('/video/:videoId/progress',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch video progress data'
       })
@@ -105,8 +106,8 @@ router.get('/video/:videoId/progress',
 // GET /api/analytics/student/:studentId/progress - Get student progress (teachers/admins only)
 router.get('/student/:studentId/progress',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  param('studentId').isUUID().withMessage('Invalid student ID'),
-  query('videoGroupId').optional().isUUID().withMessage('Invalid video group ID'),
+  validateCUIDParam('studentId', 'Invalid student ID'),
+  validateCUIDQuery('videoGroupId', 'Invalid video group ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -140,7 +141,7 @@ router.get('/student/:studentId/progress',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch student progress'
       })
@@ -151,7 +152,7 @@ router.get('/student/:studentId/progress',
 // GET /api/analytics/lesson/:lessonId/overview - Get lesson analytics overview (teachers/admins only)
 router.get('/lesson/:lessonId/overview',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  param('lessonId').isUUID().withMessage('Invalid lesson ID'),
+  validateCUIDParam('lessonId', 'Invalid lesson ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -180,7 +181,7 @@ router.get('/lesson/:lessonId/overview',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch lesson overview'
       })
@@ -202,7 +203,7 @@ router.get('/dashboard/teacher',
 
     } catch (error) {
       console.error('Error fetching teacher dashboard:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch teacher dashboard data'
       })
@@ -223,7 +224,7 @@ router.get('/dashboard/student',
 
     } catch (error) {
       console.error('Error fetching student dashboard:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch student dashboard data'
       })
@@ -233,7 +234,7 @@ router.get('/dashboard/student',
 
 // GET /api/analytics/engagement/heatmap/:videoId - Get engagement heatmap for video
 router.get('/engagement/heatmap/:videoId',
-  param('videoId').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('videoId', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -262,7 +263,7 @@ router.get('/engagement/heatmap/:videoId',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch engagement heatmap'
       })
@@ -272,7 +273,7 @@ router.get('/engagement/heatmap/:videoId',
 
 // GET /api/analytics/questions/:milestoneId/performance - Get question performance analytics
 router.get('/questions/:milestoneId/performance',
-  param('milestoneId').isUUID().withMessage('Invalid milestone ID'),
+  validateCUIDParam('milestoneId', 'Invalid milestone ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -301,7 +302,7 @@ router.get('/questions/:milestoneId/performance',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch question performance'
       })

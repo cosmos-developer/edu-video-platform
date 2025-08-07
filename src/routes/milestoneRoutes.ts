@@ -1,6 +1,7 @@
 import { Router } from 'express'
-import { body, param } from 'express-validator'
+import { body } from 'express-validator'
 import { validationResult } from 'express-validator'
+import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
 import { authenticate } from '../middleware/auth/authMiddleware'
 // import { roleMiddleware } from '../middleware/role' // TODO: Create this middleware
 import { MilestoneService } from '../services/MilestoneService'
@@ -14,11 +15,12 @@ router.use(authenticate)
 // POST /api/milestones - Create milestone for video (teachers only)
 router.post('/',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  body('videoId').isUUID().withMessage('Valid video ID is required'),
+  validateCUIDBody('videoId', 'Valid video ID is required'),
   body('timestamp').isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
-  body('type').isIn(['PAUSE', 'QUIZ', 'CHECKPOINT']).withMessage('Invalid milestone type'),
+  body('isRequired').optional().isBoolean().withMessage('isRequired must be boolean'),
+  body('retryLimit').optional().isInt({ min: 1 }).withMessage('Retry limit must be a positive integer'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -35,7 +37,8 @@ router.post('/',
         timestamp: req.body.timestamp,
         title: req.body.title,
         description: req.body.description || null,
-        type: req.body.type
+        isRequired: req.body.isRequired,
+        retryLimit: req.body.retryLimit
       }
 
       const milestone = await MilestoneService.createMilestone(milestoneData, req.user!)
@@ -70,7 +73,7 @@ router.post('/',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create milestone'
       })
@@ -80,7 +83,7 @@ router.post('/',
 
 // GET /api/milestones/video/:videoId - Get all milestones for a video
 router.get('/video/:videoId',
-  param('videoId').isUUID().withMessage('Invalid video ID'),
+  validateCUIDParam('videoId', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -109,7 +112,7 @@ router.get('/video/:videoId',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch milestones'
       })
@@ -119,11 +122,12 @@ router.get('/video/:videoId',
 
 // PUT /api/milestones/:id - Update milestone (creator or admin only)
 router.put('/:id',
-  param('id').isUUID().withMessage('Invalid milestone ID'),
+  validateCUIDParam('id', 'Invalid milestone ID'),
   body('timestamp').optional().isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
   body('title').optional().notEmpty().trim().withMessage('Title cannot be empty'),
   body('description').optional().trim(),
-  body('type').optional().isIn(['PAUSE', 'QUIZ', 'CHECKPOINT']).withMessage('Invalid milestone type'),
+  body('isRequired').optional().isBoolean().withMessage('isRequired must be boolean'),
+  body('retryLimit').optional().isInt({ min: 1 }).withMessage('Retry limit must be a positive integer'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -139,7 +143,8 @@ router.put('/:id',
         timestamp: req.body.timestamp,
         title: req.body.title,
         description: req.body.description,
-        type: req.body.type
+        isRequired: req.body.isRequired,
+        retryLimit: req.body.retryLimit
       }
 
       const milestone = await MilestoneService.updateMilestone(
@@ -178,7 +183,7 @@ router.put('/:id',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update milestone'
       })
@@ -188,7 +193,7 @@ router.put('/:id',
 
 // DELETE /api/milestones/:id - Delete milestone (creator or admin only)
 router.delete('/:id',
-  param('id').isUUID().withMessage('Invalid milestone ID'),
+  validateCUIDParam('id', 'Invalid milestone ID'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -224,7 +229,7 @@ router.delete('/:id',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to delete milestone'
       })
@@ -235,12 +240,13 @@ router.delete('/:id',
 // POST /api/milestones/:id/questions - Add question to milestone (creator or admin only)
 router.post('/:id/questions',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  param('id').isUUID().withMessage('Invalid milestone ID'),
-  body('type').isIn(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER']).withMessage('Invalid question type'),
-  body('question').notEmpty().trim().withMessage('Question text is required'),
+  validateCUIDParam('id', 'Invalid milestone ID'),
+  body('type').isIn(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER', 'FILL_IN_BLANK']).withMessage('Invalid question type'),
+  body('text').notEmpty().trim().withMessage('Question text is required'),
   body('explanation').optional().trim(),
-  body('options').optional().isArray().withMessage('Options must be an array'),
-  body('correctAnswer').notEmpty().trim().withMessage('Correct answer is required'),
+  body('hints').optional().isArray().withMessage('Hints must be an array'),
+  body('difficulty').optional().isIn(['easy', 'medium', 'hard']).withMessage('Invalid difficulty level'),
+  body('questionData').notEmpty().withMessage('Question data is required'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -255,10 +261,11 @@ router.post('/:id/questions',
       const questionData = {
         milestoneId: req.params.id,
         type: req.body.type,
-        question: req.body.question,
+        text: req.body.text,
         explanation: req.body.explanation || null,
-        options: req.body.options || [],
-        correctAnswer: req.body.correctAnswer
+        hints: req.body.hints || [],
+        difficulty: req.body.difficulty || null,
+        questionData: req.body.questionData
       }
 
       const question = await MilestoneService.addQuestionToMilestone(questionData, req.user!)
@@ -286,7 +293,7 @@ router.post('/:id/questions',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to add question'
       })

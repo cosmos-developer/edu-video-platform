@@ -1,0 +1,8 @@
+{
+  "title": "Test Physics Lesson",
+  "description": "A test lesson for Phase 1 testing",
+  "objectives": ["Learn basic physics concepts", "Understand motion"],
+  "estimatedTime": 30,
+  "difficulty": "beginner",
+  "tags": ["physics", "science"]
+}

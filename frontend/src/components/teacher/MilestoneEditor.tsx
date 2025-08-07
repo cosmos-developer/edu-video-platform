@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { milestoneService } from '../../services/video'
+import React, { useState, useEffect, useRef } from 'react'
+import { milestoneService, videoService } from '../../services/video'
 import type { Video, Milestone } from '../../services/video'
 
 interface MilestoneEditorProps {
@@ -10,8 +10,12 @@ interface MilestoneEditorProps {
 }
 
 export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }: MilestoneEditorProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false)
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0)
+  const [videoDuration, setVideoDuration] = useState(video.duration || 0)
   
   const [formData, setFormData] = useState({
     timestamp: milestone?.timestamp || 0,
@@ -33,12 +37,63 @@ export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }:
     }
   }, [milestone])
 
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const handleLoadedMetadata = () => {
+      setVideoDuration(video.duration)
+      setIsVideoLoaded(true)
+    }
+
+    const handleTimeUpdate = () => {
+      setVideoCurrentTime(video.currentTime)
+    }
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    video.addEventListener('timeupdate', handleTimeUpdate)
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+    }
+  }, [])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
       [name]: name === 'timestamp' ? parseInt(value) || 0 : value
     }))
+  }
+
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoDuration) return
+    
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const percentage = clickX / rect.width
+    const timestamp = Math.floor(percentage * videoDuration)
+    
+    setFormData(prev => ({ ...prev, timestamp }))
+    
+    // Seek video to clicked position
+    if (videoRef.current) {
+      videoRef.current.currentTime = timestamp
+    }
+  }
+
+  const handleUseCurrentTime = () => {
+    if (videoRef.current) {
+      const currentTime = Math.floor(videoRef.current.currentTime)
+      setFormData(prev => ({ ...prev, timestamp: currentTime }))
+    }
+  }
+
+  const handleSeekToMilestone = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = formData.timestamp
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +104,7 @@ export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }:
       return
     }
 
-    if (formData.timestamp < 0 || (video.duration && formData.timestamp > video.duration)) {
+    if (formData.timestamp < 0 || (videoDuration && formData.timestamp > videoDuration)) {
       setError('Timestamp must be within the video duration')
       return
     }
@@ -137,6 +192,69 @@ export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }:
             </div>
           )}
 
+          {/* Video Preview */}
+          <div className="mb-6">
+            <div className="bg-black rounded-lg overflow-hidden">
+              <video
+                ref={videoRef}
+                src={videoService.getStreamingUrl(video.id)}
+                className="w-full h-48 object-contain"
+                controls
+                playsInline
+              />
+            </div>
+            
+            {/* Timeline */}
+            {isVideoLoaded && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Click on timeline to set milestone position
+                </label>
+                <div 
+                  className="relative h-8 bg-gray-200 rounded-full cursor-pointer overflow-hidden"
+                  onClick={handleTimelineClick}
+                >
+                  {/* Progress bar */}
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-blue-200 rounded-full"
+                    style={{ width: `${(videoCurrentTime / videoDuration) * 100}%` }}
+                  />
+                  
+                  {/* Existing milestones */}
+                  {video.milestones?.map((m) => {
+                    if (m.id === milestone?.id) return null
+                    return (
+                      <div
+                        key={m.id}
+                        className="absolute top-0 w-1 h-full bg-red-500 opacity-75"
+                        style={{ left: `${(m.timestamp / videoDuration) * 100}%` }}
+                        title={`${m.title} (${formatTime(m.timestamp)})`}
+                      />
+                    )
+                  })}
+                  
+                  {/* Current milestone marker */}
+                  <div
+                    className="absolute top-0 w-3 h-full bg-green-500 rounded-full transform -translate-x-1/2 border-2 border-white shadow-lg"
+                    style={{ left: `${(formData.timestamp / videoDuration) * 100}%` }}
+                    title={`Milestone: ${formatTime(formData.timestamp)}`}
+                  />
+                  
+                  {/* Timeline markers */}
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 px-1">
+                    <span>0:00</span>
+                    <span>{formatTime(videoDuration)}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between mt-2 text-sm text-gray-600">
+                  <span>Current: {formatTime(videoCurrentTime)}</span>
+                  <span>Milestone: {formatTime(formData.timestamp)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Milestone Type */}
             <div>
@@ -175,7 +293,7 @@ export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }:
                   value={formData.timestamp}
                   onChange={handleInputChange}
                   min="0"
-                  max={video.duration || undefined}
+                  max={videoDuration || undefined}
                   step="1"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
@@ -184,9 +302,27 @@ export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }:
                   = {formatTime(formData.timestamp)}
                 </div>
               </div>
+              
+              <div className="flex items-center space-x-2 mt-2">
+                <button
+                  type="button"
+                  onClick={handleUseCurrentTime}
+                  className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                >
+                  Use Current Time ({formatTime(videoCurrentTime)})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSeekToMilestone}
+                  className="text-sm px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
+                >
+                  Seek to Milestone
+                </button>
+              </div>
+              
               <p className="text-xs text-gray-500 mt-1">
                 When this milestone should appear in the video
-                {video.duration && ` (max: ${formatTime(video.duration)})`}
+                {videoDuration && ` (max: ${formatTime(videoDuration)})`}
               </p>
             </div>
 
