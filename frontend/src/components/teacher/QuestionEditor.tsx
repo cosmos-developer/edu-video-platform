@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import { milestoneService, questionService } from '../../services/video'
 import type { Milestone, Question } from '../../services/video'
+import { useVideoStateManager } from '../../contexts/VideoStateContext'
+import { useVideoState } from '../../hooks/useVideoState'
 
 interface QuestionEditorProps {
   milestone: Milestone
+  videoId?: string
   onClose: () => void
 }
 
-export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
-  const [questions, setQuestions] = useState<Question[]>(milestone.questions || [])
+export function QuestionEditor({ milestone, videoId, onClose }: QuestionEditorProps) {
+  const manager = useVideoStateManager()
+  const { questions: allQuestions } = useVideoState(videoId)
+  const questions = allQuestions?.get(milestone.id) || []
   const [showAddForm, setShowAddForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -98,7 +103,10 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
           : undefined
       })
 
-      setQuestions(prev => [...prev, response])
+      // Add question through VideoStateManager - will update all subscribers
+      if (videoId) {
+        await manager.addQuestion(videoId, milestone.id, response)
+      }
       resetForm()
     } catch (err: any) {
       console.error('Error adding question:', err)

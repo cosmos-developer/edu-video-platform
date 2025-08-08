@@ -3,12 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { VideoPlayer } from '../../components/video/VideoPlayer'
 import { videoService, sessionService } from '../../services/video'
 import type { Video, VideoSession } from '../../services/video'
+import { useVideoState, useSessionState } from '../../hooks/useVideoState'
+import { useVideoStateManager } from '../../contexts/VideoStateContext'
 
 export default function VideoPlayerPage() {
   const { videoId } = useParams<{ videoId: string }>()
   const navigate = useNavigate()
-  const [video, setVideo] = useState<Video | null>(null)
-  const [session, setSession] = useState<VideoSession | null>(null)
+  const manager = useVideoStateManager()
+  
+  // Use unified state
+  const { video, metadata, loading: videoLoading, error: videoError } = useVideoState(videoId)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const { session, metadata: sessionMeta } = useSessionState(sessionId || undefined)
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [completionMessage, setCompletionMessage] = useState<string | null>(null)
@@ -29,15 +36,14 @@ export default function VideoPlayerPage() {
     setError(null)
 
     try {
-      // Load video details
-      const videoResponse = await videoService.getVideo(videoId)
-      setVideo(videoResponse)
+      // Load video through VideoStateManager
+      await manager.loadVideo(videoId)
 
       // Load existing session
       try {
         const sessionResponse = await sessionService.getSessionByVideo(videoId)
         if (sessionResponse) {
-          setSession(sessionResponse)
+          setSessionId(sessionResponse.id)
         }
       } catch (sessionError) {
         // Session might not exist yet, that's OK
@@ -53,44 +59,28 @@ export default function VideoPlayerPage() {
   }
 
   const handleSessionStart = async (videoId: string): Promise<VideoSession> => {
-    const newSession = await sessionService.startSession(videoId)
-    setSession(newSession)
-    return newSession
+    const sessionState = await manager.startOrResumeSession(videoId)
+    setSessionId(sessionState.session.id)
+    return sessionState.session
   }
 
   const handleProgressUpdate = async (sessionId: string, currentTime: number, totalWatchTime: number) => {
-    const response = await sessionService.updateProgress(sessionId, {
-      currentTime,
-      totalWatchTime
-    })
-    
-    setSession(response)
+    await manager.updateSessionProgress(sessionId, currentTime, totalWatchTime)
   }
 
   const handleMilestoneReached = async (sessionId: string, milestoneId: string, timestamp: number) => {
-    await sessionService.markMilestoneReached(sessionId, {
-      milestoneId,
-      timestamp
-    })
+    await manager.markMilestoneReached(sessionId, milestoneId, timestamp)
   }
 
   const handleAnswerSubmit = async (sessionId: string, questionId: string, answer: string, milestoneId: string) => {
-    const response = await sessionService.submitAnswer(sessionId, {
-      questionId,
-      answer,
-      milestoneId
-    })
-    
-    return response
+    return await manager.submitAnswer(sessionId, questionId, answer, milestoneId)
   }
 
   const handleSessionComplete = async (sessionId: string, finalTime: number, totalWatchTime: number) => {
-    const response = await sessionService.completeSession(sessionId, {
+    await sessionService.completeSession(sessionId, {
       finalTime,
       totalWatchTime
     })
-    
-    setSession(response)
     
     // Show completion message
     if (response.status === 'COMPLETED') {
@@ -101,7 +91,7 @@ export default function VideoPlayerPage() {
     }
   }
 
-  if (loading) {
+  if (loading || videoLoading) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
@@ -114,7 +104,7 @@ export default function VideoPlayerPage() {
     )
   }
 
-  if (error) {
+  if (error || videoError) {
     return (
       <div className="p-6">
         <div className="card">
@@ -123,7 +113,7 @@ export default function VideoPlayerPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Video</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
+            <p className="text-gray-600 mb-4">{error || videoError}</p>
             <button
               onClick={() => navigate('/lessons')}
               className="btn-primary"
@@ -219,27 +209,33 @@ export default function VideoPlayerPage() {
         </div>
       )}
       
-      {/* Learning Progress */}
-      {session && (
+      {/* Learning Progress - Use unified state metadata */}
+      {(session || sessionMeta) && (
         <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="card text-center">
             <div className="text-2xl font-bold text-blue-600">
-              {session.status === 'COMPLETED' ? '100' : Math.round((session.currentTime / (video?.duration || 1)) * 100)}%
+              {sessionMeta?.completionPercentage || 
+               (session?.status === 'COMPLETED' ? '100' : 
+                Math.round((session?.currentTime || 0) / (video?.duration || 1) * 100))}%
             </div>
             <div className="text-sm text-gray-600 mt-1">Progress</div>
           </div>
           
           <div className="card text-center">
             <div className="text-2xl font-bold text-green-600">
-              {session.milestoneProgress?.length || 0}
+              {session?.milestoneProgress?.length || 0}
             </div>
             <div className="text-sm text-gray-600 mt-1">Milestones Reached</div>
           </div>
           
           <div className="card text-center">
             <div className="text-2xl font-bold text-purple-600">
-              {session.questionAnswers?.filter(qa => qa.isCorrect).length || 0}
-              <span className="text-sm text-gray-500">/{session.questionAnswers?.length || 0}</span>
+              {sessionMeta?.correctAnswers || 
+               session?.questionAnswers?.filter(qa => qa.isCorrect).length || 0}
+              <span className="text-sm text-gray-500">/
+                {sessionMeta?.totalAnswers || 
+                 session?.questionAnswers?.length || 0}
+              </span>
             </div>
             <div className="text-sm text-gray-600 mt-1">Correct Answers</div>
           </div>

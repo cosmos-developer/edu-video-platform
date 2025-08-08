@@ -4,6 +4,8 @@ import { videoService } from '../../services/video'
 import { QuestionOverlay } from './QuestionOverlay'
 import { MilestoneMarkers } from './MilestoneMarkers'
 import { VideoControls } from './VideoControls'
+import { useVideoState } from '../../hooks/useVideoState'
+import { useVideoStateManager } from '../../contexts/VideoStateContext'
 
 interface VideoPlayerProps {
   video: Video
@@ -25,6 +27,8 @@ export function VideoPlayer({
   onSessionComplete
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const manager = useVideoStateManager()
+  const { milestones: stateMilestones, metadata } = useVideoState(video.id)
   const [currentSession, setCurrentSession] = useState<VideoSession | null>(session || null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -166,11 +170,13 @@ export function VideoPlayer({
   }
 
   const checkForMilestones = (currentTime: number) => {
-    if (!video.milestones || showQuestionOverlay) return
+    // Use milestones from unified state instead of video prop
+    const milestones = stateMilestones || video.milestones || []
+    if (milestones.length === 0 || showQuestionOverlay) return
 
     const reachedMilestones = currentSession?.milestoneProgress?.map(mp => mp.milestoneId) || []
     
-    const milestone = video.milestones.find(m => 
+    const milestone = milestones.find(m => 
       Math.abs(currentTime - m.timestamp) <= 1 && // Within 1 second
       !reachedMilestones.includes(m.id)
     )
@@ -330,10 +336,10 @@ export function VideoPlayer({
         crossOrigin="anonymous"
       />
 
-      {/* Milestone Markers */}
-      {video.milestones && (
+      {/* Milestone Markers - Use milestones from unified state */}
+      {(stateMilestones || video.milestones) && (
         <MilestoneMarkers
-          milestones={video.milestones}
+          milestones={stateMilestones || video.milestones || []}
           duration={duration}
           currentTime={currentTime}
           reachedMilestones={currentSession?.milestoneProgress?.map(mp => mp.milestoneId) || []}
@@ -389,8 +395,15 @@ export function VideoPlayer({
           </div>
           
           <div>
-            {video._count && (
-              <span>{video._count.milestones} interactive moments</span>
+            {/* Use metadata from unified state for accurate counts */}
+            {metadata ? (
+              <span>
+                {metadata.totalMilestones} milestones, {metadata.totalQuestions} questions
+              </span>
+            ) : (
+              video._count && (
+                <span>{video._count.milestones} interactive moments</span>
+              )
             )}
           </div>
         </div>

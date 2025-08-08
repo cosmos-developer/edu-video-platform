@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { aiService } from '../../services/ai'
 import type { GenerateQuestionsRequest, GeneratedQuestion } from '../../services/ai'
-import type { Video, Milestone } from '../../services/video'
+import type { Video, Milestone, Question } from '../../services/video'
+import { useVideoStateManager } from '../../contexts/VideoStateContext'
 
 interface AIQuestionGeneratorProps {
   video: Video
@@ -16,6 +17,7 @@ export function AIQuestionGenerator({
   onQuestionsGenerated, 
   onClose 
 }: AIQuestionGeneratorProps) {
+  const manager = useVideoStateManager()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [availableProviders, setAvailableProviders] = useState<string[]>([])
@@ -106,13 +108,19 @@ export function AIQuestionGenerator({
     setError(null)
 
     try {
-      await aiService.generateQuestionsForMilestone(milestone.id, {
+      const result = await aiService.generateQuestionsForMilestone(milestone.id, {
         content: formData.content,
         questionCount: formData.questionCount,
         questionTypes: formData.questionTypes,
         difficulty: formData.difficulty,
         provider: formData.provider
       })
+
+      // If we have the generated questions, add them through VideoStateManager
+      if (result && 'questions' in result && Array.isArray(result.questions)) {
+        const questions = result.questions as Question[]
+        await manager.addQuestions(video.id, milestone.id, questions)
+      }
 
       onQuestionsGenerated()
     } catch (err: any) {
