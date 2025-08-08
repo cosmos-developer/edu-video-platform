@@ -114,8 +114,8 @@ export default function LoginPage() {
               Demo credentials:
             </p>
             <div className="mt-2 text-xs text-gray-500 space-y-1">
-              <p>Teacher: testteacher@example.com / Password123!</p>
-              <p>Student: teststudent@example.com / Password123!</p>
+              <p>Teacher: teacher@example.com / Demo123!</p>
+              <p>Student: student@example.com / Demo123!</p>
             </div>
           </div>
         </form>
