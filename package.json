@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "dev": "prisma generate --schema=database/prisma/schema.prisma && tsx watch src/index.ts",
     "start": "node dist/index.js",
     "db:generate": "prisma generate --schema=database/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=database/prisma/schema.prisma",
@@ -20,15 +20,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "dev:setup": "bash scripts/dev-setup.sh",
-    "dev:up": "docker-compose -f docker-compose.dev.yml up -d",
-    "dev:down": "docker-compose -f docker-compose.dev.yml down",
-    "dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
-    "dev:restart": "docker-compose -f docker-compose.dev.yml restart",
-    "dev:reset": "docker-compose -f docker-compose.dev.yml down -v && docker-compose -f docker-compose.dev.yml up -d --build",
-    "dev:db-only": "docker-compose -f docker-compose.dev.yml up -d postgres redis",
-    "dev:clean": "docker-compose -f docker-compose.dev.yml down -v --remove-orphans && docker system prune -f",
-    "dev:test": "bash scripts/test-api.sh"
+    "test:api": "bash scripts/test-api.sh"
   },
   "prisma": {
     "seed": "tsx database/seeds/001_initial_data.ts",

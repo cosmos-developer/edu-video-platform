@@ -62,6 +62,16 @@ class ApiService {
           }
         }
 
+        // Log error details for debugging
+        if (error.response) {
+          console.error('API Error Response:', {
+            status: error.response.status,
+            data: error.response.data,
+            url: error.config?.url,
+            method: error.config?.method,
+            requestData: error.config?.data
+          })
+        }
         return Promise.reject(error)
       }
     )

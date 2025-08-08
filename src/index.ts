@@ -44,7 +44,26 @@ if (environment.server.nodeEnv === 'production') {
 }
 
 // Apply security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: false, // Disable to allow cross-origin video streaming
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      connectSrc: ["'self'", "https:", "wss:", "ws:", "http://localhost:*"],
+      mediaSrc: ["'self'", "blob:", "https:", "http://localhost:*"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      scriptSrcAttr: ["'none'"]
+    }
+  }
+}));
 app.use(corsMiddleware);
 app.use(securityMiddleware);
 
@@ -123,6 +142,7 @@ const startServer = async () => {
       logger.info(`Server running on port ${port} in ${environment.server.nodeEnv} mode`);
       logger.info(`Health check available at http://localhost:${port}/health`);
       logger.info(`API endpoints available at http://localhost:${port}${API_PREFIX}`);
+      logger.info(`🚀 Backend running locally with hot reload enabled!`);
     });
 
   } catch (error) {
@@ -134,7 +154,10 @@ const startServer = async () => {
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  // Don't exit in development to keep server running
+  if (environment.server.nodeEnv === 'production') {
+    process.exit(1);
+  }
 });
 
 // Handle uncaught exceptions

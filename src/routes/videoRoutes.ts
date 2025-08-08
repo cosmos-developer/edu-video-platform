@@ -10,11 +10,66 @@ import { uploadVideoMiddleware, handleUploadErrors } from '../middleware/upload/
 import { VideoProcessingService } from '../services/VideoProcessingService'
 import fs from 'fs'
 import path from 'path'
+import jwt from 'jsonwebtoken'
 
 const router = Router()
 
-// Apply authentication middleware to all routes
-router.use(authenticate)
+// Custom authentication middleware for video streaming that supports query params
+const streamingAuthenticate = async (req: AuthenticatedRequest, res: any, next: any) => {
+  // Try header authentication first
+  const authHeader = req.headers.authorization
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7)
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      // Map userId to id for consistency with regular auth
+      req.user = {
+        id: decoded.userId || decoded.id,
+        email: decoded.email,
+        role: decoded.role
+      }
+      return next()
+    } catch (error) {
+      // Fall through to query param auth
+    }
+  }
+  
+  // Try query parameter authentication for video streaming
+  const token = req.query.token as string
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      // Map userId to id for consistency with regular auth
+      req.user = {
+        id: decoded.userId || decoded.id,
+        email: decoded.email,
+        role: decoded.role
+      }
+      console.log('Streaming auth successful:', req.user)
+      return next()
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid authentication token'
+      })
+    }
+  }
+  
+  // No valid authentication found
+  return res.status(401).json({
+    success: false,
+    error: 'Authentication required'
+  })
+}
+
+// Apply authentication middleware to all routes except streaming
+router.use((req, res, next) => {
+  // Skip authentication middleware for streaming endpoint
+  if (req.path.match(/\/[^\/]+\/stream$/)) {
+    return next()
+  }
+  return authenticate(req, res, next)
+})
 
 // GET /api/videos - Get all video groups with videos (paginated)
 router.get('/', 
@@ -418,8 +473,13 @@ router.delete('/:id',
 
 // GET /api/videos/:id/stream - Stream video file (authenticated users with access)
 router.get('/:id/stream',
+  streamingAuthenticate, // Use custom auth middleware for streaming
   validateCUIDParam('id', 'Invalid video ID'),
   async (req: AuthenticatedRequest, res) => {
+    // Set CORS headers specifically for video streaming
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:3002');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -431,8 +491,14 @@ router.get('/:id/stream',
       }
 
       const videoPath = await VideoService.getVideoStreamPath(req.params.id, req.user!.id)
+      console.log('Video streaming request:', {
+        videoId: req.params.id,
+        userId: req.user!.id,
+        videoPath
+      })
 
       if (!videoPath) {
+        console.error('Video not found in database or access denied')
         return res.status(404).json({
           success: false,
           error: 'Video not found or access denied'
@@ -441,6 +507,7 @@ router.get('/:id/stream',
 
       // Check if file exists
       if (!fs.existsSync(videoPath)) {
+        console.error('Video file not found on disk:', videoPath)
         return res.status(404).json({
           success: false,
           error: 'Video file not found'
@@ -463,7 +530,7 @@ router.get('/:id/stream',
           'Content-Range': `bytes ${start}-${end}/${fileSize}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': chunkSize,
-          'Content-Type': 'video/mp4',
+          'Content-Type': 'video/mp4'
         }
 
         res.writeHead(206, head)
@@ -472,7 +539,7 @@ router.get('/:id/stream',
         // Send entire file
         const head = {
           'Content-Length': fileSize,
-          'Content-Type': VideoProcessingService.getMimeType(videoPath),
+          'Content-Type': VideoProcessingService.getMimeType(videoPath)
         }
 
         res.writeHead(200, head)

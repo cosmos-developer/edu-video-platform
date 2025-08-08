@@ -16,7 +16,7 @@ router.use(authenticate)
 router.post('/',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
   validateCUIDBody('videoId', 'Valid video ID is required'),
-  body('timestamp').isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
+  body('timestamp').isNumeric().withMessage('Timestamp must be a number'),
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
   body('isRequired').optional().isBoolean().withMessage('isRequired must be boolean'),
@@ -34,7 +34,7 @@ router.post('/',
 
       const milestoneData = {
         videoId: req.body.videoId,
-        timestamp: req.body.timestamp,
+        timestamp: Number(req.body.timestamp),
         title: req.body.title,
         description: req.body.description || null,
         isRequired: req.body.isRequired,
@@ -123,7 +123,7 @@ router.get('/video/:videoId',
 // PUT /api/milestones/:id - Update milestone (creator or admin only)
 router.put('/:id',
   validateCUIDParam('id', 'Invalid milestone ID'),
-  body('timestamp').optional().isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
+  body('timestamp').optional().isNumeric().withMessage('Timestamp must be a number'),
   body('title').optional().notEmpty().trim().withMessage('Title cannot be empty'),
   body('description').optional().trim(),
   body('isRequired').optional().isBoolean().withMessage('isRequired must be boolean'),
@@ -140,7 +140,7 @@ router.put('/:id',
       }
 
       const updateData = {
-        timestamp: req.body.timestamp,
+        timestamp: req.body.timestamp ? Number(req.body.timestamp) : undefined,
         title: req.body.title,
         description: req.body.description,
         isRequired: req.body.isRequired,

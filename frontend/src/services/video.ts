@@ -83,12 +83,15 @@ export interface Milestone {
 export interface Question {
   id: string
   milestoneId: string
-  type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER'
-  question: string
-  correctAnswer: string
+  type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'FILL_IN_BLANK'
+  text: string  // Backend returns 'text', not 'question'
   explanation: string | null
+  questionData: any  // Contains correctAnswer, options, etc. based on type
+  points?: number
+  passThreshold?: number
   createdAt: string
-  options?: QuestionOption[]
+  createdById?: string
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 }
 
 export interface QuestionOption {
@@ -102,15 +105,20 @@ export interface QuestionOption {
 export interface VideoSession {
   id: string
   videoId: string
-  userId: string
-  currentTime: number
-  totalWatchTime: number
-  status: 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED'
+  studentId: string
+  currentPosition: number
+  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED'
   completedAt: string | null
   createdAt: string
-  lastAccessedAt: string
+  lastSeenAt: string
+  startedAt: string
+  updatedAt: string
+  lastMilestoneId?: string | null
+  completedMilestones?: string[]
+  sessionData?: any
+  video?: Video
   milestoneProgress?: MilestoneProgress[]
-  questionAnswers?: QuestionAnswer[]
+  questionAttempts?: QuestionAttempt[]
 }
 
 export interface MilestoneProgress {
@@ -122,13 +130,23 @@ export interface MilestoneProgress {
   milestone?: Milestone
 }
 
-export interface QuestionAnswer {
+export interface QuestionAttempt {
   id: string
-  sessionId: string
+  studentId: string
   questionId: string
-  answer: string
-  isCorrect: boolean
-  answeredAt: string
+  sessionId?: string | null
+  status: 'IN_PROGRESS' | 'CORRECT' | 'INCORRECT' | 'PARTIAL' | 'TIMEOUT'
+  attemptNumber: number
+  studentAnswer: any
+  isCorrect?: boolean | null
+  score: number
+  timeSpent: number
+  hintsUsed: string[]
+  feedback?: string | null
+  attemptData?: any
+  createdAt: string
+  updatedAt: string
+  submittedAt?: string | null
   question?: Question
 }
 
@@ -220,9 +238,16 @@ export const videoService = {
     return response.data
   },
 
-  // Get video streaming URL
+  // Get video streaming URL with authentication token
   getStreamingUrl(videoId: string) {
-    return `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/videos/${videoId}/stream`
+    const baseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/videos/${videoId}/stream`
+    const token = localStorage.getItem('accessToken')
+    
+    if (token) {
+      return `${baseUrl}?token=${encodeURIComponent(token)}`
+    }
+    
+    return baseUrl
   },
 
   // Get video thumbnail URL
@@ -233,7 +258,8 @@ export const videoService = {
   // Get specific video
   async getVideo(videoId: string) {
     const response = await apiService.get<ApiResponse<Video>>(`/videos/${videoId}`)
-    return response.data
+    // The response is already unwrapped by apiService, but it's wrapped in success/data structure
+    return (response as any).data || response
   },
 
   // Update video
@@ -266,14 +292,49 @@ export const questionService = {
     explanation?: string
     options?: string[]
   }) {
-    const response = await apiService.post<ApiResponse<Question>>('/questions', data)
-    return response.data
+    // Transform frontend data to match backend expectations
+    let questionData: any = {}
+    
+    switch (data.type) {
+      case 'MULTIPLE_CHOICE':
+        // Find the index of the correct answer in options
+        const correctIndex = data.options ? data.options.indexOf(data.correctAnswer) : -1
+        questionData = {
+          options: data.options || [],
+          correctAnswerIndex: correctIndex >= 0 ? correctIndex : 0
+        }
+        break
+      case 'TRUE_FALSE':
+        // Convert string to boolean
+        questionData = {
+          correctAnswer: data.correctAnswer.toLowerCase() === 'true'
+        }
+        break
+      case 'SHORT_ANSWER':
+        // Store as array of acceptable answers
+        questionData = {
+          correctAnswers: [data.correctAnswer],
+          caseSensitive: false
+        }
+        break
+    }
+    
+    const requestData = {
+      milestoneId: data.milestoneId,
+      type: data.type,
+      text: data.question, // Backend expects 'text' not 'question'
+      explanation: data.explanation,
+      questionData
+    }
+    
+    const response = await apiService.post<ApiResponse<Question>>('/questions', requestData)
+    return (response as any).data
   },
 
   // Get questions for milestone
   async getQuestionsByMilestone(milestoneId: string) {
     const response = await apiService.get<ApiResponse<Question[]>>(`/questions/milestone/${milestoneId}`)
-    return response.data
+    return (response as any).data
   },
 
   // Update question
@@ -284,14 +345,49 @@ export const questionService = {
     explanation?: string
     options?: string[]
   }) {
-    const response = await apiService.put<ApiResponse<Question>>(`/questions/${questionId}`, data)
-    return response.data
+    // Transform frontend data to match backend expectations
+    const requestData: any = {}
+    if (data.type !== undefined) requestData.type = data.type
+    if (data.question !== undefined) requestData.text = data.question // Backend expects 'text' not 'question'
+    if (data.explanation !== undefined) requestData.explanation = data.explanation
+    
+    // Only set questionData if we have relevant data to update
+    if ((data.correctAnswer !== undefined || data.options !== undefined) && data.type) {
+      let questionData: any = {}
+      
+      switch (data.type) {
+        case 'MULTIPLE_CHOICE':
+          const correctIndex = data.options && data.correctAnswer ? 
+            data.options.indexOf(data.correctAnswer) : -1
+          questionData = {
+            options: data.options || [],
+            correctAnswerIndex: correctIndex >= 0 ? correctIndex : 0
+          }
+          break
+        case 'TRUE_FALSE':
+          questionData = {
+            correctAnswer: data.correctAnswer ? data.correctAnswer.toLowerCase() === 'true' : false
+          }
+          break
+        case 'SHORT_ANSWER':
+          questionData = {
+            correctAnswers: data.correctAnswer ? [data.correctAnswer] : [],
+            caseSensitive: false
+          }
+          break
+      }
+      
+      requestData.questionData = questionData
+    }
+    
+    const response = await apiService.put<ApiResponse<Question>>(`/questions/${questionId}`, requestData)
+    return (response as any).data
   },
 
   // Delete question
   async deleteQuestion(questionId: string) {
     const response = await apiService.delete<ApiResponse<{ message: string }>>(`/questions/${questionId}`)
-    return response.data
+    return (response as any).data
   }
 }
 
@@ -350,7 +446,8 @@ export const sessionService = {
   // Start or resume session
   async startSession(videoId: string) {
     const response = await apiService.post<ApiResponse<VideoSession>>('/sessions/start', { videoId })
-    return response.data
+    // apiService already unwraps, so response is the ApiResponse object
+    return (response as any).data
   },
 
   // Update progress
@@ -359,7 +456,8 @@ export const sessionService = {
     totalWatchTime?: number
   }) {
     const response = await apiService.put<ApiResponse<VideoSession>>(`/sessions/${sessionId}/progress`, data)
-    return response.data
+    // apiService already unwraps, so response is the ApiResponse object
+    return (response as any).data
   },
 
   // Mark milestone reached
@@ -368,7 +466,7 @@ export const sessionService = {
     timestamp: number
   }) {
     const response = await apiService.post<ApiResponse<MilestoneProgress>>(`/sessions/${sessionId}/milestone`, data)
-    return response.data
+    return (response as any).data
   },
 
   // Submit question answer
@@ -377,8 +475,13 @@ export const sessionService = {
     answer: string
     milestoneId: string
   }) {
-    const response = await apiService.post<ApiResponse<QuestionAnswer>>(`/sessions/${sessionId}/question`, data)
-    return response.data
+    const response = await apiService.post<ApiResponse<{
+      answer: QuestionAttempt
+      isCorrect: boolean
+      score: number
+      explanation?: string
+    }>>(`/sessions/${sessionId}/question`, data)
+    return (response as any).data
   },
 
   // Complete session
@@ -387,20 +490,20 @@ export const sessionService = {
     totalWatchTime: number
   }) {
     const response = await apiService.put<ApiResponse<VideoSession>>(`/sessions/${sessionId}/complete`, data)
-    return response.data
+    return (response as any).data
   },
 
   // Get session for video
   async getSessionByVideo(videoId: string) {
     const response = await apiService.get<ApiResponse<VideoSession | null>>(`/sessions/video/${videoId}`)
-    return response.data
+    return (response as any).data
   },
 
   // Get user sessions
   async getUserSessions(params: {
     page?: number
     limit?: number
-    status?: 'IN_PROGRESS' | 'COMPLETED' | 'PAUSED'
+    status?: 'ACTIVE' | 'COMPLETED' | 'PAUSED'
   } = {}) {
     const searchParams = new URLSearchParams()
     if (params.page) searchParams.append('page', params.page.toString())

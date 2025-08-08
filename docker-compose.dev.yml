@@ -43,64 +43,6 @@ services:
     networks:
       - app-network
 
-  # Node.js Backend API
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: interactive-learning-backend
-    restart: unless-stopped
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-      
-      # Database Configuration
-      DATABASE_URL: postgresql://postgres:postgres_dev_password@postgres:5432/interactive_learning?schema=public
-      
-      # JWT Configuration
-      JWT_SECRET: dev_jwt_secret_change_in_production
-      JWT_REFRESH_SECRET: dev_refresh_secret_change_in_production
-      JWT_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
-      
-      # Redis Configuration
-      REDIS_URL: redis://:redis_dev_password@redis:6379
-      
-      # Development Configuration
-      LOG_LEVEL: debug
-      ENABLE_DEBUG_LOGGING: true
-      
-      # Rate Limiting
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 1000
-      
-      # CORS Configuration
-      CORS_ORIGIN: http://localhost:3001
-      
-      # AI Configuration (placeholder for development)
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/dist
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - app-network
-
   # Database Management Tool (Adminer)
   adminer:
     image: adminer:latest
@@ -127,33 +69,6 @@ services:
       - redis_insight_data:/db
     depends_on:
       - redis
-    networks:
-      - app-network
-
-  # React Frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: interactive-learning-frontend
-    restart: unless-stopped
-    environment:
-      - REACT_APP_API_BASE_URL=http://localhost:3000/api
-      - REACT_APP_WS_URL=ws://localhost:3000
-      - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true
-      - WDS_SOCKET_HOST=localhost
-      - WDS_SOCKET_PORT=3001
-    ports:
-      - "3001:3001"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/dist
-    depends_on:
-      - backend
-    stdin_open: true
-    tty: true
     networks:
       - app-network
 

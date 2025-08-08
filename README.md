@@ -252,3 +252,14 @@ An interactive video-based learning system that pauses at key milestones to pres
 4. Development sprint planning
 5. Testing strategy and quality assurance
 6. Deployment and launch planning
+
+
+## 🚀 Quick Start for Developers
+
+See [QUICK_START.md](./QUICK_START.md) for the development setup guide.
+
+```bash
+# Get started in 2 commands:
+./dev.sh install
+./dev.sh start
+```

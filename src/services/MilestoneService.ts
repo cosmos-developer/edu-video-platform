@@ -50,9 +50,8 @@ export class MilestoneService {
       throw new Error('Video not found')
     }
 
-    // Check permissions - only video uploader, lesson creator, or admin can create milestones
+    // Check permissions - only lesson creator or admin can create milestones
     if (
-      video.uploadedBy !== user.id && 
       video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
@@ -90,11 +89,7 @@ export class MilestoneService {
         retryLimit: data.retryLimit ?? 3
       },
       include: {
-        questions: {
-          include: {
-            questionData: true
-          }
-        },
+        questions: true,
         _count: {
           select: { questions: true }
         }
@@ -133,11 +128,7 @@ export class MilestoneService {
     const milestones = await prisma.milestone.findMany({
       where: { videoId },
       include: {
-        questions: {
-          include: {
-            questionData: true
-          }
-        },
+        questions: true,
         _count: {
           select: { questions: true }
         }
@@ -205,11 +196,7 @@ export class MilestoneService {
       where: { id: milestoneId },
       data: updateData,
       include: {
-        questions: {
-          include: {
-            questionData: true
-          }
-        },
+        questions: true,
         _count: {
           select: { questions: true }
         }

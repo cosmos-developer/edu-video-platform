@@ -5,13 +5,15 @@ import type { Milestone, Question } from '../../services/video'
 interface QuestionEditorProps {
   milestone: Milestone
   onClose: () => void
+  onQuestionsUpdated?: () => void  // Callback when questions are added/removed
 }
 
-export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
-  const [questions, setQuestions] = useState<Question[]>(milestone.questions || [])
+export function QuestionEditor({ milestone, onClose, onQuestionsUpdated }: QuestionEditorProps) {
+  const [questions, setQuestions] = useState<Question[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loadingQuestions, setLoadingQuestions] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [previewAnswer, setPreviewAnswer] = useState('')
 
@@ -22,6 +24,25 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
     correctAnswer: '',
     options: ['', '', '', ''] // For multiple choice
   })
+
+  // Load questions when component mounts
+  useEffect(() => {
+    loadQuestions()
+  }, [milestone.id])
+
+  const loadQuestions = async () => {
+    setLoadingQuestions(true)
+    try {
+      const loadedQuestions = await questionService.getQuestionsByMilestone(milestone.id)
+      setQuestions(loadedQuestions || [])
+    } catch (err: any) {
+      console.error('Error loading questions:', err)
+      // Fall back to milestone questions if API fails
+      setQuestions(milestone.questions || [])
+    } finally {
+      setLoadingQuestions(false)
+    }
+  }
 
   const resetForm = () => {
     setFormData({
@@ -100,6 +121,10 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
 
       setQuestions(prev => [...prev, response])
       resetForm()
+      // Notify parent that questions have been updated
+      if (onQuestionsUpdated) {
+        onQuestionsUpdated()
+      }
     } catch (err: any) {
       console.error('Error adding question:', err)
       setError(err.message || 'Failed to add question')
@@ -165,7 +190,12 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
                 )}
               </div>
 
-              {questions.length === 0 ? (
+              {loadingQuestions ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                  <p className="text-gray-500">Loading questions...</p>
+                </div>
+              ) : questions.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                   <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -198,27 +228,33 @@ export function QuestionEditor({ milestone, onClose }: QuestionEditorProps) {
                       </div>
                       
                       <h4 className="font-medium text-gray-900 mb-2">
-                        {question.question}
+                        {question.text}
                       </h4>
                       
-                      {question.type === 'MULTIPLE_CHOICE' && question.options && (
+                      {question.type === 'MULTIPLE_CHOICE' && question.questionData?.options && (
                         <div className="space-y-1 mb-2">
-                          {question.options.map((option, _optIndex) => (
-                            <div key={option.id} className="flex items-center text-sm">
+                          {question.questionData.options.map((option: string, optIndex: number) => (
+                            <div key={optIndex} className="flex items-center text-sm">
                               <div className={`w-2 h-2 rounded-full mr-2 ${
-                                option.isCorrect ? 'bg-green-500' : 'bg-gray-300'
+                                optIndex === question.questionData.correctAnswerIndex ? 'bg-green-500' : 'bg-gray-300'
                               }`}></div>
-                              <span className={option.isCorrect ? 'font-medium text-green-700' : 'text-gray-600'}>
-                                {option.text}
+                              <span className={optIndex === question.questionData.correctAnswerIndex ? 'font-medium text-green-700' : 'text-gray-600'}>
+                                {option}
                               </span>
                             </div>
                           ))}
                         </div>
                       )}
                       
-                      {question.type !== 'MULTIPLE_CHOICE' && (
+                      {question.type === 'TRUE_FALSE' && (
                         <div className="text-sm text-green-700 font-medium mb-2">
-                          Correct: {question.correctAnswer}
+                          Correct: {question.questionData?.correctAnswer ? 'True' : 'False'}
+                        </div>
+                      )}
+                      
+                      {question.type === 'SHORT_ANSWER' && question.questionData?.correctAnswers && (
+                        <div className="text-sm text-green-700 font-medium mb-2">
+                          Correct: {question.questionData.correctAnswers.join(', ')}
                         </div>
                       )}
                       

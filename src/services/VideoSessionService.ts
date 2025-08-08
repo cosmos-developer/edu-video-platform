@@ -72,10 +72,17 @@ export class VideoSessionService {
           video: {
             include: {
               milestones: {
-                orderBy: { timestamp: 'asc' }
+                orderBy: { timestamp: 'asc' },
+                include: {
+                  questions: true
+                }
               }
             }
-          }
+          },
+          milestoneProgress: {
+            orderBy: { reachedAt: 'asc' }
+          },
+          questionAttempts: true
         }
       })
     } else {
@@ -91,10 +98,17 @@ export class VideoSessionService {
           video: {
             include: {
               milestones: {
-                orderBy: { timestamp: 'asc' }
+                orderBy: { timestamp: 'asc' },
+                include: {
+                  questions: true
+                }
               }
             }
-          }
+          },
+          milestoneProgress: {
+            orderBy: { reachedAt: 'asc' }
+          },
+          questionAttempts: true
         }
       })
     }
@@ -134,10 +148,17 @@ export class VideoSessionService {
         video: {
           include: {
             milestones: {
-              orderBy: { timestamp: 'asc' }
+              orderBy: { timestamp: 'asc' },
+              include: {
+                questions: true
+              }
             }
           }
-        }
+        },
+        milestoneProgress: {
+          orderBy: { reachedAt: 'asc' }
+        },
+        questionAttempts: true
       }
     })
 
@@ -169,22 +190,34 @@ export class VideoSessionService {
       throw new Error('Milestone not found')
     }
 
-    // Check if milestone progress already exists
-    // Add milestone to completed milestones array if not already there
-    const currentMilestones = session.completedMilestones || []
-    if (!currentMilestones.includes(milestoneId)) {
-      const updatedMilestones = [...currentMilestones, milestoneId]
-      await prisma.studentSession.update({
-        where: { id: sessionId },
-        data: {
-          completedMilestones: updatedMilestones,
-          lastMilestoneId: milestoneId,
-          lastSeenAt: new Date()
+    // Create or update milestone progress using the new table
+    const milestoneProgress = await prisma.milestoneProgress.upsert({
+      where: {
+        sessionId_milestoneId: {
+          sessionId: sessionId,
+          milestoneId: milestoneId
         }
-      })
-    }
+      },
+      update: {
+        reachedAt: new Date()
+      },
+      create: {
+        sessionId: sessionId,
+        milestoneId: milestoneId,
+        reachedAt: new Date()
+      }
+    })
 
-    return { milestoneId, timestamp, reachedAt: new Date() }
+    // Update session with last milestone
+    await prisma.studentSession.update({
+      where: { id: sessionId },
+      data: {
+        lastMilestoneId: milestoneId,
+        lastSeenAt: new Date()
+      }
+    })
+
+    return milestoneProgress
   }
 
   static async submitAnswer(sessionId: string, data: SubmitAnswerData, studentId: string) {
@@ -296,6 +329,7 @@ export class VideoSessionService {
         data: {
           studentId,
           questionId: data.questionId,
+          sessionId: sessionId, // Link to session
           studentAnswer: { answer: data.answer }, // Store as JSON
           isCorrect,
           score: score,
@@ -347,10 +381,17 @@ export class VideoSessionService {
         video: {
           include: {
             milestones: {
-              orderBy: { timestamp: 'asc' }
+              orderBy: { timestamp: 'asc' },
+              include: {
+                questions: true
+              }
             }
           }
-        }
+        },
+        milestoneProgress: {
+          orderBy: { reachedAt: 'asc' }
+        },
+        questionAttempts: true
       }
     })
 
@@ -407,9 +448,17 @@ export class VideoSessionService {
               }
             }
           }
-        }
+        },
+        milestoneProgress: {
+          orderBy: { reachedAt: 'asc' }
+        },
+        questionAttempts: true
       }
     })
+
+    if (!session) {
+      return null
+    }
 
     return session
   }

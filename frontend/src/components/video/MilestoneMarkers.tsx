@@ -16,7 +16,7 @@ export function MilestoneMarkers({
   if (duration === 0 || milestones.length === 0) return null
 
   return (
-    <div className="absolute bottom-16 left-4 right-4 h-2 pointer-events-none">
+    <div className="absolute bottom-4 left-4 right-4 h-2 pointer-events-none">
       {milestones.map((milestone) => {
         const percentage = (milestone.timestamp / duration) * 100
         const isReached = reachedMilestones.includes(milestone.id)
@@ -25,7 +25,7 @@ export function MilestoneMarkers({
         return (
           <div
             key={milestone.id}
-            className="absolute transform -translate-x-1/2"
+            className="absolute transform -translate-x-1/2 group"
             style={{ left: `${percentage}%` }}
             title={`${milestone.title} - ${Math.floor(milestone.timestamp / 60)}:${(milestone.timestamp % 60).toFixed(0).padStart(2, '0')}`}
           >

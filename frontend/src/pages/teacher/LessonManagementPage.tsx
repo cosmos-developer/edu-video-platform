@@ -521,6 +521,14 @@ export default function LessonManagementPage() {
         <QuestionEditor
           milestone={selectedMilestone}
           onClose={() => setShowQuestionEditor(false)}
+          onQuestionsUpdated={() => {
+            // Reload the selected video to get updated milestone counts
+            if (selectedVideo) {
+              handleVideoSelect(selectedVideo)
+            }
+            // Also reload lesson to update video groups in the sidebar
+            loadLesson()
+          }}
         />
       )}
 

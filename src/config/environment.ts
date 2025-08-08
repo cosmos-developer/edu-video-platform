@@ -20,9 +20,9 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
-  // Google Cloud Storage
-  GOOGLE_CLOUD_PROJECT_ID: z.string(),
-  GOOGLE_CLOUD_STORAGE_BUCKET: z.string(),
+  // Google Cloud Storage (optional in development)
+  GOOGLE_CLOUD_PROJECT_ID: z.string().optional(),
+  GOOGLE_CLOUD_STORAGE_BUCKET: z.string().optional(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
 
   // Redis Configuration

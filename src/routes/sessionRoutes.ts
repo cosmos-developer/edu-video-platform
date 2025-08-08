@@ -57,8 +57,8 @@ router.post('/start',
 // PUT /api/sessions/:sessionId/progress - Update session progress
 router.put('/:sessionId/progress',
   validateCUIDParam('sessionId', 'Invalid session ID'),
-  body('currentTime').isInt({ min: 0 }).withMessage('Current time must be a positive integer'),
-  body('totalWatchTime').optional().isInt({ min: 0 }).withMessage('Total watch time must be a positive integer'),
+  body('currentTime').isNumeric().withMessage('Current time must be a number'),
+  body('totalWatchTime').optional().isNumeric().withMessage('Total watch time must be a number'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -71,8 +71,8 @@ router.put('/:sessionId/progress',
       }
 
       const progressData = {
-        currentTime: req.body.currentTime,
-        totalWatchTime: req.body.totalWatchTime
+        currentTime: Math.floor(Number(req.body.currentTime)),
+        totalWatchTime: req.body.totalWatchTime ? Math.floor(Number(req.body.totalWatchTime)) : undefined
       }
 
       const session = await VideoSessionService.updateProgress(
@@ -116,7 +116,7 @@ router.put('/:sessionId/progress',
 router.post('/:sessionId/milestone',
   validateCUIDParam('sessionId', 'Invalid session ID'),
   validateCUIDBody('milestoneId', 'Valid milestone ID is required'),
-  body('timestamp').isInt({ min: 0 }).withMessage('Timestamp must be a positive integer'),
+  body('timestamp').isNumeric().withMessage('Timestamp must be a number'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -131,7 +131,7 @@ router.post('/:sessionId/milestone',
       const result = await VideoSessionService.markMilestoneReached(
         req.params.sessionId,
         req.body.milestoneId,
-        req.body.timestamp,
+        Math.floor(Number(req.body.timestamp)),
         req.user!.id
       )
 
@@ -243,8 +243,8 @@ router.post('/:sessionId/question',
 // PUT /api/sessions/:sessionId/complete - Mark session as completed
 router.put('/:sessionId/complete',
   validateCUIDParam('sessionId', 'Invalid session ID'),
-  body('finalTime').isInt({ min: 0 }).withMessage('Final time must be a positive integer'),
-  body('totalWatchTime').isInt({ min: 0 }).withMessage('Total watch time must be a positive integer'),
+  body('finalTime').isNumeric().withMessage('Final time must be a number'),
+  body('totalWatchTime').isNumeric().withMessage('Total watch time must be a number'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)
@@ -257,8 +257,8 @@ router.put('/:sessionId/complete',
       }
 
       const completionData = {
-        finalTime: req.body.finalTime,
-        totalWatchTime: req.body.totalWatchTime
+        finalTime: Math.floor(Number(req.body.finalTime)),
+        totalWatchTime: Math.floor(Number(req.body.totalWatchTime))
       }
 
       const session = await VideoSessionService.completeSession(
@@ -344,7 +344,7 @@ router.get('/video/:videoId',
 router.get('/user',
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
-  query('status').optional().isIn(['IN_PROGRESS', 'COMPLETED', 'PAUSED']).withMessage('Invalid status'),
+  query('status').optional().isIn(['ACTIVE', 'COMPLETED', 'PAUSED']).withMessage('Invalid status'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const errors = validationResult(req)

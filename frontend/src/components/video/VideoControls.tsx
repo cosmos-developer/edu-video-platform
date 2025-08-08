@@ -1,4 +1,5 @@
 import React from 'react'
+import type { Milestone } from '../../services/video'
 
 interface VideoControlsProps {
   isPlaying: boolean
@@ -7,6 +8,8 @@ interface VideoControlsProps {
   volume: number
   isMuted: boolean
   isFullscreen: boolean
+  milestones?: Milestone[]
+  reachedMilestones?: string[]
   onPlay: () => void
   onPause: () => void
   onSeek: (time: number) => void
@@ -22,6 +25,8 @@ export function VideoControls({
   volume,
   isMuted,
   isFullscreen,
+  milestones = [],
+  reachedMilestones = [],
   onPlay,
   onPause,
   onSeek,
@@ -54,18 +59,83 @@ export function VideoControls({
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
-      {/* Progress Bar */}
-      <div 
-        className="w-full h-2 bg-gray-600 rounded-full cursor-pointer mb-4 relative"
-        onClick={handleProgressClick}
-      >
+    <div className="bg-gray-900 p-4">
+      {/* Progress Bar with Milestones */}
+      <div className="mb-4">
         <div 
-          className="h-full bg-blue-500 rounded-full relative"
-          style={{ width: `${progressPercentage}%` }}
+          className="w-full h-2 bg-gray-700 rounded-full cursor-pointer relative group"
+          onClick={handleProgressClick}
         >
-          <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full shadow-lg opacity-0 hover:opacity-100 transition-opacity"></div>
+          {/* Progress Fill */}
+          <div 
+            className="h-full bg-blue-500 rounded-full relative transition-all"
+            style={{ width: `${progressPercentage}%` }}
+          >
+            <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          </div>
+          
+          {/* Milestone Markers */}
+          {milestones.map((milestone) => {
+            const percentage = duration > 0 ? (milestone.timestamp / duration) * 100 : 0
+            const isReached = reachedMilestones.includes(milestone.id)
+            const isCurrent = Math.abs(currentTime - milestone.timestamp) <= 1
+            
+            return (
+              <div
+                key={milestone.id}
+                className="absolute top-1/2 transform -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${percentage}%` }}
+                title={`${milestone.title} - ${formatTime(milestone.timestamp)}`}
+              >
+                <div 
+                  className={`w-3 h-3 rounded-full border-2 transition-all duration-200 ${
+                    isCurrent
+                      ? 'bg-yellow-400 border-yellow-400 scale-150 shadow-lg animate-pulse'
+                      : milestone.type === 'QUIZ'
+                      ? isReached 
+                        ? 'bg-green-500 border-green-500' 
+                        : 'bg-red-500 border-red-500'
+                      : milestone.type === 'CHECKPOINT'
+                      ? isReached
+                        ? 'bg-blue-500 border-blue-500'
+                        : 'bg-blue-300 border-blue-300'
+                      : isReached
+                        ? 'bg-gray-500 border-gray-500'
+                        : 'bg-gray-300 border-gray-300'
+                  }`}
+                />
+                
+                {/* Milestone tooltip on hover */}
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-10">
+                  <div className="font-semibold">{milestone.title}</div>
+                  <div className="text-gray-300">{formatTime(milestone.timestamp)}</div>
+                  {milestone.type === 'QUIZ' && milestone._count?.questions && (
+                    <div className="text-gray-400">{milestone._count.questions} questions</div>
+                  )}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black"></div>
+                </div>
+              </div>
+            )
+          })}
         </div>
+        
+        {/* Milestone Legend */}
+        {milestones.length > 0 && (
+          <div className="flex items-center justify-end mt-2 space-x-4 text-xs text-gray-400">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+              <span>Quiz</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+              <span>Checkpoint</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-gray-500 rounded-full mr-1"></div>
+              <span>Pause</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between text-white">

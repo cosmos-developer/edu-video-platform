@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import type { Video, VideoSession, Milestone } from '../../services/video'
 import { videoService } from '../../services/video'
 import { QuestionOverlay } from './QuestionOverlay'
-import { MilestoneMarkers } from './MilestoneMarkers'
 import { VideoControls } from './VideoControls'
 
 interface VideoPlayerProps {
@@ -12,7 +11,7 @@ interface VideoPlayerProps {
   onProgressUpdate: (sessionId: string, currentTime: number, totalWatchTime: number) => Promise<void>
   onMilestoneReached: (sessionId: string, milestoneId: string, timestamp: number) => Promise<void>
   onAnswerSubmit: (sessionId: string, questionId: string, answer: string, milestoneId: string) => Promise<{ isCorrect: boolean; explanation?: string }>
-  onSessionComplete: (sessionId: string, finalTime: number, totalWatchTime: number) => Promise<void>
+  onSessionComplete: (sessionId: string, finalTime: number, totalWatchTime: number) => Promise<VideoSession | void>
 }
 
 export function VideoPlayer({
@@ -33,19 +32,28 @@ export function VideoPlayer({
   const [totalWatchTime, setTotalWatchTime] = useState(0)
   const [currentMilestone, setCurrentMilestone] = useState<Milestone | null>(null)
   const [showQuestionOverlay, setShowQuestionOverlay] = useState(false)
+  const [showMilestoneNotification, setShowMilestoneNotification] = useState(false)
   const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [processedMilestones, setProcessedMilestones] = useState<Set<string>>(new Set())
 
   // Progress tracking
   const progressUpdateInterval = useRef<NodeJS.Timeout | undefined>(undefined)
   const lastProgressUpdate = useRef<number>(0)
+  const isProcessingMilestone = useRef<boolean>(false)
 
   useEffect(() => {
     if (session) {
       setCurrentSession(session)
       setTotalWatchTime(session.totalWatchTime)
+      
+      // Initialize processed milestones from session
+      if (session.milestoneProgress) {
+        const reached = new Set(session.milestoneProgress.map(mp => mp.milestoneId))
+        setProcessedMilestones(reached)
+      }
       
       // Resume video from last position
       if (videoRef.current && session.currentTime > 0) {
@@ -156,50 +164,82 @@ export function VideoPlayer({
   const updateProgress = async (currentTime: number) => {
     if (!currentSession) return
 
-    const currentWatchTime = totalWatchTime + (watchStartTime ? Date.now() - watchStartTime : 0)
+    // Calculate total watch time in milliseconds
+    const additionalTime = watchStartTime ? Date.now() - watchStartTime : 0
+    const currentWatchTimeMs = (totalWatchTime || 0) + additionalTime
+    
+    // Convert to seconds and ensure it's a valid number
+    const totalWatchTimeSec = Math.floor(currentWatchTimeMs / 1000) || 0
     
     try {
-      await onProgressUpdate(currentSession.id, currentTime, Math.floor(currentWatchTime / 1000))
+      await onProgressUpdate(currentSession.id, currentTime, totalWatchTimeSec)
     } catch (error) {
       console.error('Failed to update progress:', error)
     }
   }
 
   const checkForMilestones = (currentTime: number) => {
-    if (!video.milestones || showQuestionOverlay) return
-
-    const reachedMilestones = currentSession?.milestoneProgress?.map(mp => mp.milestoneId) || []
+    if (!video.milestones || isProcessingMilestone.current) return
     
-    const milestone = video.milestones.find(m => 
-      Math.abs(currentTime - m.timestamp) <= 1 && // Within 1 second
-      !reachedMilestones.includes(m.id)
-    )
+    // Find the next unprocessed milestone within range
+    const milestone = video.milestones.find(m => {
+      // Skip if already processed
+      if (processedMilestones.has(m.id)) return false
+      
+      // Check if we've reached this milestone (with small tolerance)
+      const tolerance = 0.5
+      return currentTime >= m.timestamp - tolerance && currentTime <= m.timestamp + tolerance
+    })
 
     if (milestone) {
+      // Mark as processing and processed immediately to prevent re-triggering
+      isProcessingMilestone.current = true
+      setProcessedMilestones(prev => new Set(prev).add(milestone.id))
       handleMilestoneReached(milestone)
     }
   }
 
   const handleMilestoneReached = async (milestone: Milestone) => {
-    if (!currentSession) return
+    if (!currentSession) {
+      isProcessingMilestone.current = false
+      return
+    }
 
     try {
-      // Pause video for quiz milestones
-      if (milestone.type === 'QUIZ' && videoRef.current) {
+      // Pause video for all milestone types
+      if (videoRef.current) {
         videoRef.current.pause()
       }
 
-      // Mark milestone as reached
+      // Mark milestone as reached in backend
       await onMilestoneReached(currentSession.id, milestone.id, milestone.timestamp)
       
       setCurrentMilestone(milestone)
       
-      // Show question overlay for quiz milestones
-      if (milestone.type === 'QUIZ' && milestone.questions && milestone.questions.length > 0) {
+      // Determine action based on milestone type
+      if (milestone.type === 'QUIZ' || (milestone.questions && milestone.questions.length > 0)) {
+        // Show question overlay for quiz milestones
         setShowQuestionOverlay(true)
+      } else {
+        // For PAUSE or CHECKPOINT milestones without questions
+        setShowMilestoneNotification(true)
+        
+        // Auto-resume after notification for non-quiz milestones
+        setTimeout(() => {
+          setShowMilestoneNotification(false)
+          setCurrentMilestone(null)
+          
+          if (videoRef.current) {
+            // Skip past the milestone and resume
+            videoRef.current.currentTime = milestone.timestamp + 1
+            videoRef.current.play()
+          }
+          isProcessingMilestone.current = false
+        }, 2000) // 2 second pause for non-quiz milestones
       }
     } catch (error) {
       console.error('Failed to mark milestone:', error)
+      isProcessingMilestone.current = false
     }
   }
 
@@ -219,26 +259,36 @@ export function VideoPlayer({
 
   const handleQuestionComplete = () => {
     setShowQuestionOverlay(false)
-    setCurrentMilestone(null)
     
-    // Resume video
-    if (videoRef.current) {
-      videoRef.current.play()
-    }
+    // Resume playback
+    setTimeout(() => {
+      if (videoRef.current && currentMilestone) {
+        // Skip past the milestone to avoid re-triggering
+        videoRef.current.currentTime = currentMilestone.timestamp + 1
+        videoRef.current.play()
+      }
+      setCurrentMilestone(null)
+      isProcessingMilestone.current = false
+    }, 300)
   }
 
   const handleVideoComplete = async () => {
     if (!currentSession) return
 
     updateWatchTime()
-    const finalWatchTime = totalWatchTime + (watchStartTime ? Date.now() - watchStartTime : 0)
+    const finalWatchTime = (totalWatchTime || 0) + (watchStartTime ? Date.now() - watchStartTime : 0)
+    const finalWatchTimeSec = Math.floor(finalWatchTime / 1000) || 0
 
     try {
-      await onSessionComplete(
+      const completedSession = await onSessionComplete(
         currentSession.id,
-        duration,
-        Math.floor(finalWatchTime / 1000)
+        duration || 0,
+        finalWatchTimeSec
       )
+      // Update the local session state with the completed session data
+      if (completedSession) {
+        setCurrentSession(completedSession)
+      }
     } catch (error) {
       console.error('Failed to complete session:', error)
     }
@@ -252,6 +302,12 @@ export function VideoPlayer({
         const newSession = await onSessionStart(video.id)
         setCurrentSession(newSession)
         setTotalWatchTime(newSession.totalWatchTime)
+        
+        // Initialize processed milestones from new session
+        if (newSession.milestoneProgress) {
+          const reached = new Set(newSession.milestoneProgress.map(mp => mp.milestoneId))
+          setProcessedMilestones(reached)
+        }
       } catch (error) {
         console.error('Failed to start session:', error)
         setLoading(false)
@@ -314,33 +370,26 @@ export function VideoPlayer({
   }
 
   return (
-    <div className="relative bg-black rounded-lg overflow-hidden">
-      {loading && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="text-white">Starting session...</div>
-        </div>
-      )}
-      
-      <video
-        ref={videoRef}
-        className="w-full h-auto"
-        src={videoService.getStreamingUrl(video.id)}
-        poster={video.thumbnailUrl ? videoService.getThumbnailUrl(video.id) : undefined}
-        playsInline
-        crossOrigin="anonymous"
-      />
-
-      {/* Milestone Markers */}
-      {video.milestones && (
-        <MilestoneMarkers
-          milestones={video.milestones}
-          duration={duration}
-          currentTime={currentTime}
-          reachedMilestones={currentSession?.milestoneProgress?.map(mp => mp.milestoneId) || []}
+    <div className="bg-black rounded-lg overflow-hidden">
+      {/* Video Container */}
+      <div className="relative">
+        {loading && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="text-white">Starting session...</div>
+          </div>
+        )}
+        
+        <video
+          ref={videoRef}
+          className="w-full h-auto block"
+          src={videoService.getStreamingUrl(video.id)}
+          poster={video.thumbnailUrl ? videoService.getThumbnailUrl(video.id) : undefined}
+          playsInline
+          crossOrigin="anonymous"
         />
-      )}
+      </div>
 
-      {/* Video Controls */}
+      {/* Video Controls - Outside video, below it */}
       <VideoControls
         isPlaying={isPlaying}
         currentTime={currentTime}
@@ -348,6 +397,8 @@ export function VideoPlayer({
         volume={volume}
         isMuted={isMuted}
         isFullscreen={isFullscreen}
+        milestones={video.milestones}
+        reachedMilestones={Array.from(processedMilestones)}
         onPlay={handlePlay}
         onPause={handlePause}
         onSeek={handleSeek}
@@ -365,6 +416,27 @@ export function VideoPlayer({
         />
       )}
 
+      {/* Milestone Notification */}
+      {showMilestoneNotification && currentMilestone && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[90]">
+          <div className="bg-white rounded-lg p-6 max-w-md text-center animate-pulse mx-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 bg-blue-100">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Milestone Reached!
+            </h3>
+            <p className="text-lg text-gray-700 font-medium mb-2">{currentMilestone.title}</p>
+            {currentMilestone.description && (
+              <p className="text-gray-600">{currentMilestone.description}</p>
+            )}
+            <div className="mt-4 text-sm text-gray-500">Resuming shortly...</div>
+          </div>
+        </div>
+      )}
+
       {/* Video Info */}
       <div className="p-4 bg-gray-50">
         <h2 className="text-xl font-semibold text-gray-900">{video.title}</h2>
@@ -372,28 +444,14 @@ export function VideoPlayer({
           <p className="mt-2 text-gray-600">{video.description}</p>
         )}
         
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-          <div>
-            {currentSession ? (
-              <span>
-                Progress: {formatTime(currentTime)} / {formatTime(duration)}
-                {currentSession.status === 'COMPLETED' && (
-                  <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                    Completed
-                  </span>
-                )}
-              </span>
-            ) : (
-              <span>Duration: {formatTime(duration)}</span>
-            )}
+        {currentSession?.status === 'COMPLETED' && (
+          <div className="mt-3 inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            Completed
           </div>
-          
-          <div>
-            {video._count && (
-              <span>{video._count.milestones} interactive moments</span>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

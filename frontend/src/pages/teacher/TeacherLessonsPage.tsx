@@ -88,6 +88,26 @@ export default function TeacherLessonsPage() {
     }
   }
 
+  const handleDeleteLesson = async (lessonId: string, lessonTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent navigating to lesson management
+    
+    // Confirm deletion
+    const confirmed = confirm(
+      `Are you sure you want to delete "${lessonTitle}"?\n\nThis action cannot be undone and will permanently remove the lesson and all its content.\n\nNote: Lessons with student progress cannot be deleted and must be archived instead.`
+    )
+    
+    if (!confirmed) return
+
+    try {
+      await lessonService.deleteLesson(lessonId)
+      loadLessons() // Refresh the list
+    } catch (err: any) {
+      console.error('Error deleting lesson:', err)
+      // Show error notification (you could add a toast here)
+      alert(err.message || 'Failed to delete lesson')
+    }
+  }
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'PUBLISHED':
@@ -125,7 +145,7 @@ export default function TeacherLessonsPage() {
             My Lessons
           </h1>
           <p className="text-gray-600 mt-1">
-            Manage your draft and published lessons
+            Create, edit, publish, and manage your lessons
           </p>
         </div>
         
@@ -277,14 +297,27 @@ export default function TeacherLessonsPage() {
                   <span>Edit Lesson</span>
                 </div>
                 
-                {lesson.status === 'DRAFT' && (
+                <div className="flex items-center space-x-2">
+                  {lesson.status === 'DRAFT' && (
+                    <button
+                      onClick={(e) => handlePublishLesson(lesson.id, e)}
+                      className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Publish
+                    </button>
+                  )}
+                  
                   <button
-                    onClick={(e) => handlePublishLesson(lesson.id, e)}
-                    className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
+                    onClick={(e) => handleDeleteLesson(lesson.id, lesson.title, e)}
+                    className="px-3 py-1 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors flex items-center space-x-1"
+                    title="Delete lesson permanently"
                   >
-                    Publish
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete</span>
                   </button>
-                )}
+                </div>
               </div>
             </div>
           ))}

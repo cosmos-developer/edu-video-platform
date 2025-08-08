@@ -234,6 +234,7 @@ model Milestone {
   timestamp   Float  // Timestamp in seconds where video pauses
   title       String
   description String?
+  type        MilestoneType @default(CHECKPOINT) // Type of milestone
   order       Int    // Order of milestones within video
   
   // Milestone configuration
@@ -247,6 +248,7 @@ model Milestone {
   // Relations
   video     Video      @relation(fields: [videoId], references: [id], onDelete: Cascade)
   questions Question[]
+  progress  MilestoneProgress[]
   
   // Indexes for fast milestone lookups during video playback
   @@index([videoId])
@@ -259,6 +261,12 @@ model Milestone {
 // ========================================
 // QUESTION MANAGEMENT & WORKFLOW (Phase 1)
 // ========================================
+
+enum MilestoneType {
+  PAUSE
+  QUIZ
+  CHECKPOINT
+}
 
 enum QuestionType {
   MULTIPLE_CHOICE
@@ -361,6 +369,8 @@ model StudentSession {
   // Relations
   student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   video   Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  milestoneProgress MilestoneProgress[]
+  questionAttempts  QuestionAttempt[]
   
   // Indexes for cross-device session management
   @@index([studentId])
@@ -370,6 +380,24 @@ model StudentSession {
   @@unique([studentId, videoId]) // One active session per student per video
   
   @@map("student_sessions")
+}
+
+model MilestoneProgress {
+  id          String   @id @default(cuid())
+  sessionId   String
+  milestoneId String
+  reachedAt   DateTime @default(now())
+  
+  // Relations
+  session   StudentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  milestone Milestone      @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  
+  // Ensure unique milestone per session
+  @@unique([sessionId, milestoneId])
+  @@index([sessionId])
+  @@index([milestoneId])
+  
+  @@map("milestone_progress")
 }
 
 model StudentProgress {
@@ -432,6 +460,7 @@ model QuestionAttempt {
   id         String        @id @default(cuid())
   studentId  String
   questionId String
+  sessionId  String?       // Link to video session
   status     AttemptStatus @default(IN_PROGRESS)
   
   // Attempt data
@@ -456,6 +485,7 @@ model QuestionAttempt {
   // Relations
   student  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  session  StudentSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   
   // Indexes for grading queries
   @@index([studentId])

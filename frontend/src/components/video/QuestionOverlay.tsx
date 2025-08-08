@@ -14,6 +14,7 @@ export function QuestionOverlay({
 }: QuestionOverlayProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState('')
+  const [selectedAnswerText, setSelectedAnswerText] = useState('') // For display purposes
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{
     isCorrect: boolean
@@ -22,7 +23,7 @@ export function QuestionOverlay({
   } | null>(null)
   const [completedQuestions, setCompletedQuestions] = useState<Set<number>>(new Set())
   const [showCorrectAnswer, setShowCorrectAnswer] = useState(false)
-
+  
   const questions = milestone.questions || []
   const currentQuestion = questions[currentQuestionIndex]
 
@@ -53,63 +54,77 @@ export function QuestionOverlay({
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1)
       setSelectedAnswer('')
+      setSelectedAnswerText('')
       setFeedback(null)
     } else {
       onComplete()
     }
   }
 
-  const handleOptionSelect = (option: string) => {
+  const handleOptionSelect = (option: string, index?: number) => {
     if (feedback?.shown) return
-    setSelectedAnswer(option)
+    // For multiple choice, store both the option text and index
+    if (currentQuestion.type === 'MULTIPLE_CHOICE' && index !== undefined) {
+      setSelectedAnswer(index.toString())
+      setSelectedAnswerText(option)
+    } else {
+      setSelectedAnswer(option)
+      setSelectedAnswerText(option)
+    }
   }
 
   const renderQuestionContent = () => {
     switch (currentQuestion.type) {
       case 'MULTIPLE_CHOICE':
+        // Questions from backend have questionData with options array
+        const options = currentQuestion.questionData?.options || []
+        const correctIndex = currentQuestion.questionData?.correctAnswerIndex || 0
+        
         return (
           <div className="space-y-3">
-            {currentQuestion.options?.map((option, _index) => (
+            {options.map((option: string, index: number) => (
               <button
-                key={option.id}
-                onClick={() => handleOptionSelect(option.text)}
+                key={index}
+                onClick={() => handleOptionSelect(option, index)}
                 disabled={feedback?.shown}
                 className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
-                  selectedAnswer === option.text
+                  selectedAnswer === index.toString()
                     ? feedback?.shown
-                      ? option.isCorrect
+                      ? index === correctIndex
                         ? 'border-green-500 bg-green-50'
                         : 'border-red-500 bg-red-50'
                       : 'border-blue-500 bg-blue-50'
-                    : feedback?.shown && option.isCorrect
+                    : feedback?.shown && index === correctIndex
                       ? 'border-green-500 bg-green-50'
                       : 'border-gray-300 hover:border-gray-400'
                 } ${feedback?.shown ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50'}`}
               >
                 <div className="flex items-center">
                   <div className={`w-4 h-4 rounded-full border-2 mr-3 ${
-                    selectedAnswer === option.text
+                    selectedAnswer === index.toString()
                       ? feedback?.shown
-                        ? option.isCorrect
+                        ? index === correctIndex
                           ? 'border-green-500 bg-green-500'
                           : 'border-red-500 bg-red-500'
                         : 'border-blue-500 bg-blue-500'
-                      : feedback?.shown && option.isCorrect
+                      : feedback?.shown && index === correctIndex
                         ? 'border-green-500 bg-green-500'
                         : 'border-gray-300'
                   }`}>
-                    {(selectedAnswer === option.text || (feedback?.shown && option.isCorrect)) && (
+                    {(selectedAnswer === index.toString() || (feedback?.shown && index === correctIndex)) && (
                       <div className="w-full h-full rounded-full bg-white scale-50"></div>
                     )}
                   </div>
-                  <span className="text-gray-800">{option.text}</span>
+                  <span className="text-gray-800">{option}</span>
                 </div>
               </button>
-            )) || []}
+            ))}
           </div>
         )
 
       case 'TRUE_FALSE':
+        const correctAnswer = currentQuestion.questionData?.correctAnswer
+        
         return (
           <div className="space-y-3">
             {['True', 'False'].map((option) => (
@@ -120,11 +135,11 @@ export function QuestionOverlay({
                 className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
                   selectedAnswer === option
                     ? feedback?.shown
-                      ? currentQuestion.correctAnswer.toLowerCase() === option.toLowerCase()
+                      ? (option === 'True' && correctAnswer === true) || (option === 'False' && correctAnswer === false)
                         ? 'border-green-500 bg-green-50'
                         : 'border-red-500 bg-red-50'
                       : 'border-blue-500 bg-blue-50'
-                    : feedback?.shown && currentQuestion.correctAnswer.toLowerCase() === option.toLowerCase()
+                    : feedback?.shown && ((option === 'True' && correctAnswer === true) || (option === 'False' && correctAnswer === false))
                       ? 'border-green-500 bg-green-50'
                       : 'border-gray-300 hover:border-gray-400'
                 } ${feedback?.shown ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50'}`}
@@ -133,15 +148,15 @@ export function QuestionOverlay({
                   <div className={`w-4 h-4 rounded-full border-2 mr-3 ${
                     selectedAnswer === option
                       ? feedback?.shown
-                        ? currentQuestion.correctAnswer.toLowerCase() === option.toLowerCase()
+                        ? (option === 'True' && correctAnswer === true) || (option === 'False' && correctAnswer === false)
                           ? 'border-green-500 bg-green-500'
                           : 'border-red-500 bg-red-500'
                         : 'border-blue-500 bg-blue-500'
-                      : feedback?.shown && currentQuestion.correctAnswer.toLowerCase() === option.toLowerCase()
+                      : feedback?.shown && ((option === 'True' && correctAnswer === true) || (option === 'False' && correctAnswer === false))
                         ? 'border-green-500 bg-green-500'
                         : 'border-gray-300'
                   }`}>
-                    {(selectedAnswer === option || (feedback?.shown && currentQuestion.correctAnswer.toLowerCase() === option.toLowerCase())) && (
+                    {(selectedAnswer === option || (feedback?.shown && ((option === 'True' && correctAnswer === true) || (option === 'False' && correctAnswer === false)))) && (
                       <div className="w-full h-full rounded-full bg-white scale-50"></div>
                     )}
                   </div>
@@ -157,7 +172,10 @@ export function QuestionOverlay({
           <div>
             <textarea
               value={selectedAnswer}
-              onChange={(e) => setSelectedAnswer(e.target.value)}
+              onChange={(e) => {
+                setSelectedAnswer(e.target.value)
+                setSelectedAnswerText(e.target.value)
+              }}
               disabled={feedback?.shown}
               placeholder="Type your answer here..."
               className={`w-full p-3 border rounded-lg resize-none h-24 focus:outline-none focus:ring-2 ${
@@ -182,8 +200,8 @@ export function QuestionOverlay({
   }
 
   return (
-    <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full m-4 max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100]">
+      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -212,7 +230,7 @@ export function QuestionOverlay({
           {/* Question */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              {currentQuestion.question}
+              {currentQuestion.text || currentQuestion.question}
             </h3>
             {renderQuestionContent()}
           </div>
@@ -252,7 +270,13 @@ export function QuestionOverlay({
               {!feedback.isCorrect && showCorrectAnswer && (
                 <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
                   <p className="text-sm text-green-800">
-                    <strong>Correct answer:</strong> {currentQuestion.correctAnswer}
+                    <strong>Correct answer:</strong> {
+                      currentQuestion.type === 'MULTIPLE_CHOICE' 
+                        ? currentQuestion.questionData?.options?.[currentQuestion.questionData?.correctAnswerIndex]
+                        : currentQuestion.type === 'TRUE_FALSE'
+                        ? currentQuestion.questionData?.correctAnswer ? 'True' : 'False'
+                        : currentQuestion.questionData?.correctAnswers?.[0] || 'N/A'
+                    }
                   </p>
                 </div>
               )}

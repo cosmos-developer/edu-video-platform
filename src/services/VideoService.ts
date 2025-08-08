@@ -141,9 +141,17 @@ export class VideoService {
           videos: {
             orderBy: { order: 'asc' },
             include: {
-              // Simplified includes - just get milestones without deep nesting
+              // Include milestones with their questions
               milestones: {
-                orderBy: { timestamp: 'asc' }
+                orderBy: { timestamp: 'asc' },
+                include: {
+                  questions: {
+                    orderBy: { createdAt: 'asc' }
+                  },
+                  _count: {
+                    select: { questions: true }
+                  }
+                }
               },
               _count: {
                 select: { 
@@ -336,9 +344,17 @@ export class VideoService {
           }
         },
         include: {
-          // Simplified includes to avoid complex nested queries
+          // Include milestones with their questions
           milestones: {
-            orderBy: { timestamp: 'asc' }
+            orderBy: { timestamp: 'asc' },
+            include: {
+              questions: {
+                orderBy: { createdAt: 'asc' }
+              },
+              _count: {
+                select: { questions: true }
+              }
+            }
           },
           videoGroup: {
             select: {
@@ -402,9 +418,17 @@ export class VideoService {
         where: { id: videoId },
         data: updateData,
         include: {
-          // Simplified includes
+          // Include milestones with their questions
           milestones: {
-            orderBy: { timestamp: 'asc' }
+            orderBy: { timestamp: 'asc' },
+            include: {
+              questions: {
+                orderBy: { createdAt: 'asc' }
+              },
+              _count: {
+                select: { questions: true }
+              }
+            }
           },
           videoGroup: {
             select: {
@@ -488,11 +512,11 @@ export class VideoService {
   static async getVideoStreamPath(videoId: string, userId: string): Promise<string | null> {
     const video = await this.getVideoById(videoId, userId)
     
-    if (!video || !video.fileName) {
+    if (!video || !video.filePath) {
       return null
     }
 
-    return getVideoFilePath(video.fileName)
+    return getVideoFilePath(video.filePath)
   }
 
   /**
