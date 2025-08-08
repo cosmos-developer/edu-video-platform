@@ -5,6 +5,8 @@ import { lessonService } from '../../services/lesson'
 import type { VideoGroup, Video, Milestone } from '../../services/video'
 import type { Lesson } from '../../services/lesson'
 import { useAuth } from '../../hooks/useAuth'
+import { useVideoState } from '../../hooks/useVideoState'
+import { useVideoStateManager } from '../../contexts/VideoStateContext'
 import { VideoUploadForm } from '../../components/teacher/VideoUploadForm'
 import { MilestoneEditor } from '../../components/teacher/MilestoneEditor'
 import { QuestionEditor } from '../../components/teacher/QuestionEditor'
@@ -90,13 +92,17 @@ export default function LessonManagementPage() {
   const { lessonId } = useParams<{ lessonId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const manager = useVideoStateManager()
   
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [videoGroups, setVideoGroups] = useState<VideoGroup[]>([])
-  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null)
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Use unified video state
+  const { state: videoState, milestones, metadata } = useVideoState(selectedVideoId || undefined)
   
   const [showVideoUpload, setShowVideoUpload] = useState(false)
   const [showMilestoneEditor, setShowMilestoneEditor] = useState(false)
@@ -182,21 +188,20 @@ export default function LessonManagementPage() {
     }
   }
 
-  const handleMilestoneAdded = (milestone: Milestone) => {
-    if (selectedVideo) {
-      setSelectedVideo(prev => prev ? {
-        ...prev,
-        milestones: [...(prev.milestones || []), milestone]
-      } : null)
+  const handleMilestoneAdded = async (milestone: Milestone) => {
+    if (selectedVideoId) {
+      // Add milestone through VideoStateManager - will update all subscribers
+      await manager.addMilestone(selectedVideoId, milestone)
     }
     setShowMilestoneEditor(false)
   }
 
   const handleVideoSelect = async (video: Video) => {
     try {
-      // Load video details with milestones
-      const response = await videoService.getVideo(video.id)
-      setSelectedVideo(response)
+      // Set selected video ID - useVideoState hook will handle loading
+      setSelectedVideoId(video.id)
+      // Load video into state manager
+      await manager.loadVideo(video.id)
     } catch (error) {
       console.error('Error loading video details:', error)
     }
@@ -209,10 +214,7 @@ export default function LessonManagementPage() {
 
   const handleAIQuestionsGenerated = () => {
     setShowAIGenerator(false)
-    // Reload the selected video to get updated milestones/questions
-    if (selectedVideo) {
-      handleVideoSelect(selectedVideo)
-    }
+    // No need to reload - VideoStateManager will notify all subscribers
   }
 
   const handlePreviewLesson = () => {
@@ -313,7 +315,7 @@ export default function LessonManagementPage() {
                     key={video.id}
                     onClick={() => handleVideoSelect(video)}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedVideo?.id === video.id
+                      selectedVideoId === video.id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                     }`}
@@ -369,24 +371,24 @@ export default function LessonManagementPage() {
 
         {/* Video Details & Milestones */}
         <div className="lg:col-span-2">
-          {selectedVideo ? (
+          {videoState ? (
             <div className="space-y-6">
               {/* Video Details */}
               <div className="card">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Video Details</h2>
                 <div className="space-y-3">
                   <div>
-                    <h3 className="font-medium text-gray-900">{selectedVideo.title}</h3>
-                    {selectedVideo.description && (
-                      <p className="text-gray-600 mt-1">{selectedVideo.description}</p>
+                    <h3 className="font-medium text-gray-900">{videoState.video.title}</h3>
+                    {videoState.video.description && (
+                      <p className="text-gray-600 mt-1">{videoState.video.description}</p>
                     )}
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500">
-                      Duration: {formatDuration(selectedVideo.duration)}
+                      Duration: {formatDuration(videoState.video.duration)}
                     </div>
                     <button
-                      onClick={() => navigate(`/video/${selectedVideo.id}`)}
+                      onClick={() => navigate(`/video/${videoState.video.id}`)}
                       className="btn-secondary"
                     >
                       Preview Video
@@ -418,9 +420,9 @@ export default function LessonManagementPage() {
                   </div>
                 </div>
 
-                {selectedVideo.milestones && selectedVideo.milestones.length > 0 ? (
+                {milestones && milestones.length > 0 ? (
                   <div className="space-y-3">
-                    {selectedVideo.milestones
+                    {milestones
                       .sort((a, b) => a.timestamp - b.timestamp)
                       .map((milestone) => (
                         <div
@@ -455,7 +457,7 @@ export default function LessonManagementPage() {
                               )}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {milestone._count?.questions || 0} questions
+                              {metadata?.questionsPerMilestone.get(milestone.id) || 0} questions
                             </div>
                           </div>
                         </div>
@@ -508,9 +510,9 @@ export default function LessonManagementPage() {
         />
       )}
 
-      {showMilestoneEditor && selectedVideo && (
+      {showMilestoneEditor && videoState && (
         <MilestoneEditor
-          video={selectedVideo}
+          video={videoState.video}
           milestone={selectedMilestone}
           onMilestoneAdded={handleMilestoneAdded}
           onClose={() => setShowMilestoneEditor(false)}
@@ -520,21 +522,14 @@ export default function LessonManagementPage() {
       {showQuestionEditor && selectedMilestone && (
         <QuestionEditor
           milestone={selectedMilestone}
+          videoId={selectedVideoId || undefined}
           onClose={() => setShowQuestionEditor(false)}
-          onQuestionsUpdated={() => {
-            // Reload the selected video to get updated milestone counts
-            if (selectedVideo) {
-              handleVideoSelect(selectedVideo)
-            }
-            // Also reload lesson to update video groups in the sidebar
-            loadLesson()
-          }}
         />
       )}
 
-      {showAIGenerator && selectedVideo && (
+      {showAIGenerator && videoState && (
         <AIQuestionGenerator
-          video={selectedVideo}
+          video={videoState.video}
           milestone={selectedMilestone || undefined}
           onQuestionsGenerated={handleAIQuestionsGenerated}
           onClose={() => setShowAIGenerator(false)}

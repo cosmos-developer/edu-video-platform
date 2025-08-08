@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { VideoStateProvider } from './contexts/VideoStateContext'
 import { useAuth } from './hooks/useAuth'
 import Layout from './components/layout/Layout'
 import LoginPage from './pages/auth/LoginPage'
@@ -56,9 +57,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-50">
-            <Routes>
+        <VideoStateProvider>
+          <Router>
+            <div className="min-h-screen bg-gray-50">
+              <Routes>
               {/* Public Routes */}
               <Route 
                 path="/login" 
@@ -100,6 +102,7 @@ function App() {
             </Routes>
           </div>
         </Router>
+      </VideoStateProvider>
       </AuthProvider>
     </QueryClientProvider>
   )
