@@ -5,7 +5,7 @@ import { QuestionOverlay } from './QuestionOverlay'
 import { MilestoneMarkers } from './MilestoneMarkers'
 import { VideoControls } from './VideoControls'
 import { useVideoState } from '../../hooks/useVideoState'
-import { useVideoStateManager } from '../../contexts/VideoStateContext'
+// import { useVideoStateManager } from '../../contexts/VideoStateContext'
 
 interface VideoPlayerProps {
   video: Video
@@ -27,7 +27,7 @@ export function VideoPlayer({
   onSessionComplete
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const manager = useVideoStateManager()
+  // const manager = useVideoStateManager() // Not currently used
   const { milestones: stateMilestones, metadata } = useVideoState(video.id)
   const [currentSession, setCurrentSession] = useState<VideoSession | null>(session || null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -49,11 +49,13 @@ export function VideoPlayer({
   useEffect(() => {
     if (session) {
       setCurrentSession(session)
-      setTotalWatchTime(session.totalWatchTime)
+      // Calculate total watch time from session data if available
+      const watchTime = session.sessionData?.totalWatchTime || 0
+      setTotalWatchTime(watchTime)
       
       // Resume video from last position
-      if (videoRef.current && session.currentTime > 0) {
-        videoRef.current.currentTime = session.currentTime
+      if (videoRef.current && session.currentPosition > 0) {
+        videoRef.current.currentTime = session.currentPosition
       }
     }
   }, [session])
@@ -66,9 +68,9 @@ export function VideoPlayer({
       setDuration(video.duration)
       
       // Resume from session position
-      if (currentSession?.currentTime) {
-        video.currentTime = currentSession.currentTime
-        setCurrentTime(currentSession.currentTime)
+      if (currentSession?.currentPosition) {
+        video.currentTime = currentSession.currentPosition
+        setCurrentTime(currentSession.currentPosition)
       }
     }
 
@@ -257,7 +259,8 @@ export function VideoPlayer({
       try {
         const newSession = await onSessionStart(video.id)
         setCurrentSession(newSession)
-        setTotalWatchTime(newSession.totalWatchTime)
+        const watchTime = newSession.sessionData?.totalWatchTime || 0
+        setTotalWatchTime(watchTime)
       } catch (error) {
         console.error('Failed to start session:', error)
         setLoading(false)

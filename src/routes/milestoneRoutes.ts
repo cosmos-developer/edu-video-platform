@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { body } from 'express-validator'
 import { validationResult } from 'express-validator'
 import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
@@ -21,7 +21,7 @@ router.post('/',
   body('description').optional().trim(),
   body('isRequired').optional().isBoolean().withMessage('isRequired must be boolean'),
   body('retryLimit').optional().isInt({ min: 1 }).withMessage('Retry limit must be a positive integer'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -84,7 +84,7 @@ router.post('/',
 // GET /api/milestones/video/:videoId - Get all milestones for a video
 router.get('/video/:videoId',
   validateCUIDParam('videoId', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -128,7 +128,7 @@ router.put('/:id',
   body('description').optional().trim(),
   body('isRequired').optional().isBoolean().withMessage('isRequired must be boolean'),
   body('retryLimit').optional().isInt({ min: 1 }).withMessage('Retry limit must be a positive integer'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -194,7 +194,7 @@ router.put('/:id',
 // DELETE /api/milestones/:id - Delete milestone (creator or admin only)
 router.delete('/:id',
   validateCUIDParam('id', 'Invalid milestone ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -247,7 +247,7 @@ router.post('/:id/questions',
   body('hints').optional().isArray().withMessage('Hints must be an array'),
   body('difficulty').optional().isIn(['easy', 'medium', 'hard']).withMessage('Invalid difficulty level'),
   body('questionData').notEmpty().withMessage('Question data is required'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {

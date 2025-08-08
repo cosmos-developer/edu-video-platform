@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { body, query } from 'express-validator'
 import { validationResult } from 'express-validator'
 import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
@@ -14,7 +14,7 @@ router.use(authenticate)
 // POST /api/sessions/start - Start or resume video session
 router.post('/start',
   validateCUIDBody('videoId', 'Valid video ID is required'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -59,7 +59,7 @@ router.put('/:sessionId/progress',
   validateCUIDParam('sessionId', 'Invalid session ID'),
   body('currentTime').isNumeric().withMessage('Current time must be a number'),
   body('totalWatchTime').optional().isNumeric().withMessage('Total watch time must be a number'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -71,7 +71,7 @@ router.put('/:sessionId/progress',
       }
 
       const progressData = {
-        currentTime: Math.floor(Number(req.body.currentTime)),
+        currentPosition: Math.floor(Number(req.body.currentTime)),
         totalWatchTime: req.body.totalWatchTime ? Math.floor(Number(req.body.totalWatchTime)) : undefined
       }
 
@@ -117,7 +117,7 @@ router.post('/:sessionId/milestone',
   validateCUIDParam('sessionId', 'Invalid session ID'),
   validateCUIDBody('milestoneId', 'Valid milestone ID is required'),
   body('timestamp').isNumeric().withMessage('Timestamp must be a number'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -179,7 +179,7 @@ router.post('/:sessionId/question',
   validateCUIDBody('questionId', 'Valid question ID is required'),
   body('answer').notEmpty().trim().withMessage('Answer is required'),
   validateCUIDBody('milestoneId', 'Valid milestone ID is required'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -245,7 +245,7 @@ router.put('/:sessionId/complete',
   validateCUIDParam('sessionId', 'Invalid session ID'),
   body('finalTime').isNumeric().withMessage('Final time must be a number'),
   body('totalWatchTime').isNumeric().withMessage('Total watch time must be a number'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -301,7 +301,7 @@ router.put('/:sessionId/complete',
 // GET /api/sessions/video/:videoId - Get user's session for a specific video
 router.get('/video/:videoId',
   validateCUIDParam('videoId', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -345,7 +345,7 @@ router.get('/user',
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('status').optional().isIn(['ACTIVE', 'COMPLETED', 'PAUSED']).withMessage('Invalid status'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -361,7 +361,7 @@ router.get('/user',
       const status = req.query.status as string
 
       const result = await VideoSessionService.getUserSessions({
-        userId: req.user!.id,
+        studentId: req.user!.id,
         page,
         limit,
         status

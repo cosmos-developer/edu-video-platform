@@ -21,7 +21,7 @@ interface VideoUploadFormWrapperProps {
   getOrCreateVideoGroup: () => Promise<string>
 }
 
-function VideoUploadFormWrapper({ lesson, videoGroups, onVideoUploaded, onClose, getOrCreateVideoGroup }: VideoUploadFormWrapperProps) {
+function VideoUploadFormWrapper({ onVideoUploaded, onClose, getOrCreateVideoGroup }: VideoUploadFormWrapperProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [groupId, setGroupId] = useState<string | null>(null)
@@ -160,7 +160,7 @@ export default function LessonManagementPage() {
     }
   }
 
-  const handleVideoAdded = (video: Video) => {
+  const handleVideoAdded = () => {
     // For now, we'll refresh the lesson data to get updated video groups
     loadLesson()
     setShowVideoUpload(false)

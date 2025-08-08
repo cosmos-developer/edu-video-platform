@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { body } from 'express-validator'
 import { validationResult } from 'express-validator'
 import { validateCUIDParam } from '../utils/validators'
@@ -44,7 +44,7 @@ router.post('/generate-questions',
   body('questionTypes').optional().isArray().withMessage('Question types must be an array'),
   body('difficulty').optional().isIn(['EASY', 'MEDIUM', 'HARD']).withMessage('Invalid difficulty level'),
   body('provider').optional().isIn(['OPENAI', 'CLAUDE']).withMessage('Invalid AI provider'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -109,7 +109,7 @@ router.post('/generate-for-milestone/:milestoneId',
   body('questionTypes').optional().isArray().withMessage('Question types must be an array'),
   body('difficulty').optional().isIn(['EASY', 'MEDIUM', 'HARD']).withMessage('Invalid difficulty level'),
   body('provider').optional().isIn(['OPENAI', 'CLAUDE']).withMessage('Invalid AI provider'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -170,7 +170,7 @@ router.post('/generate-milestone-with-questions/:videoId',
   body('questionTypes').optional().isArray().withMessage('Question types must be an array'),
   body('difficulty').optional().isIn(['EASY', 'MEDIUM', 'HARD']).withMessage('Invalid difficulty level'),
   body('provider').optional().isIn(['OPENAI', 'CLAUDE']).withMessage('Invalid AI provider'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {

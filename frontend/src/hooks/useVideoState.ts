@@ -17,7 +17,7 @@ export function useVideoState(videoId: string | undefined) {
     }
     
     // Subscribe to video state changes
-    const unsubscribe = manager.subscribeToVideo(videoId, (id, videoState) => {
+    const unsubscribe = manager.subscribeToVideo(videoId, (_id, videoState) => {
       setState(videoState)
       setLoading(videoState.metadata.isLoading)
       setError(videoState.metadata.error)
@@ -73,7 +73,7 @@ export function useSessionState(sessionId: string | undefined) {
     }
     
     // Subscribe to session state changes
-    const unsubscribe = manager.subscribeToSession(sessionId, (id, sessionState) => {
+    const unsubscribe = manager.subscribeToSession(sessionId, (_id, sessionState) => {
       setState(sessionState)
     })
     

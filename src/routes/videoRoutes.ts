@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { body, query } from 'express-validator'
 import { validationResult } from 'express-validator'
 import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
@@ -26,7 +26,11 @@ const streamingAuthenticate = async (req: AuthenticatedRequest, res: any, next: 
       req.user = {
         id: decoded.userId || decoded.id,
         email: decoded.email,
-        role: decoded.role
+        firstName: decoded.firstName || '',
+        lastName: decoded.lastName || '',
+        role: decoded.role,
+        status: 'ACTIVE',
+        createdAt: new Date()
       }
       return next()
     } catch (error) {
@@ -43,7 +47,11 @@ const streamingAuthenticate = async (req: AuthenticatedRequest, res: any, next: 
       req.user = {
         id: decoded.userId || decoded.id,
         email: decoded.email,
-        role: decoded.role
+        firstName: decoded.firstName || '',
+        lastName: decoded.lastName || '',
+        role: decoded.role,
+        status: 'ACTIVE',
+        createdAt: new Date()
       }
       console.log('Streaming auth successful:', req.user)
       return next()
@@ -76,7 +84,7 @@ router.get('/',
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().isString().trim().withMessage('Search must be a string'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -122,7 +130,7 @@ router.get('/',
 // GET /api/videos/groups/:id - Get specific video group with videos
 router.get('/groups/:id',
   validateCUIDParam('id', 'Invalid group ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -163,7 +171,7 @@ router.post('/groups',
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
   validateCUIDBody('lessonId', 'Valid lesson ID is required'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -176,7 +184,10 @@ router.post('/groups',
 
       const videoGroupData = {
         title: req.body.title,
-        description: req.body.description || null
+        description: req.body.description || null,
+        tags: req.body.tags || [],
+        isPublic: req.body.isPublic || false,
+        createdBy: req.user!.id
       }
 
       const videoGroup = await VideoService.createVideoGroup(videoGroupData, req.body.lessonId)
@@ -204,7 +215,7 @@ router.put('/groups/:id',
   body('description').optional().trim(),
   body('tags').optional().isArray().withMessage('Tags must be an array'),
   body('isPublic').optional().isBoolean().withMessage('isPublic must be boolean'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -266,7 +277,7 @@ router.post('/groups/:groupId/videos',
   validateCUIDParam('groupId', 'Invalid group ID'),
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -332,7 +343,7 @@ router.post('/groups/:groupId/videos',
 // GET /api/videos/:id - Get specific video with milestones
 router.get('/:id',
   validateCUIDParam('id', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -372,7 +383,7 @@ router.put('/:id',
   validateCUIDParam('id', 'Invalid video ID'),
   body('title').optional().notEmpty().trim().withMessage('Title cannot be empty'),
   body('description').optional().trim(),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -428,7 +439,7 @@ router.put('/:id',
 // DELETE /api/videos/:id - Delete video (uploader or admin only)
 router.delete('/:id',
   validateCUIDParam('id', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -475,7 +486,7 @@ router.delete('/:id',
 router.get('/:id/stream',
   streamingAuthenticate, // Use custom auth middleware for streaming
   validateCUIDParam('id', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     // Set CORS headers specifically for video streaming
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:3002');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -559,7 +570,7 @@ router.get('/:id/stream',
 // GET /api/videos/:id/thumbnail - Serve video thumbnail (authenticated users with access)
 router.get('/:id/thumbnail',
   validateCUIDParam('id', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {

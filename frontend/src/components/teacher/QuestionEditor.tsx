@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { milestoneService, questionService } from '../../services/video'
-import type { Milestone, Question } from '../../services/video'
+import { questionService } from '../../services/video'
+import type { Milestone } from '../../services/video'
 import { useVideoStateManager } from '../../contexts/VideoStateContext'
 import { useVideoState } from '../../hooks/useVideoState'
 
@@ -11,10 +11,10 @@ interface QuestionEditorProps {
   onQuestionsUpdated?: () => void  // Callback when questions are added/removed
 }
 
-export function QuestionEditor({ milestone, videoId, onClose }: QuestionEditorProps) {
+export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated }: QuestionEditorProps) {
   const manager = useVideoStateManager()
   const { questions: allQuestions } = useVideoState(videoId)
-  const questions = allQuestions?.get(milestone.id) || []
+  const [questions, setQuestions] = useState(allQuestions?.get(milestone.id) || [])
   const [showAddForm, setShowAddForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -218,7 +218,7 @@ export function QuestionEditor({ milestone, videoId, onClose }: QuestionEditorPr
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {questions.map((question, index) => (
+                  {questions.map((question: any, index: number) => (
                     <div key={question.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center space-x-2">

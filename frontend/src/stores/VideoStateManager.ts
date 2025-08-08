@@ -1,13 +1,19 @@
-import { 
+import type { 
   Video, 
   Milestone, 
   Question, 
-  VideoSession, 
-  MilestoneProgress,
-  QuestionAnswer,
+  VideoSession
+} from '../services/video'
+
+// Define QuestionAnswer type locally
+interface QuestionAnswer {
+  questionId: string
+  answer: string
+  isCorrect: boolean
+  timestamp?: number
+}
+import {
   videoService,
-  milestoneService,
-  questionService,
   sessionService
 } from '../services/video'
 
@@ -145,7 +151,16 @@ class VideoStateManager {
     
     // Set loading state
     this.updateVideoState(videoId, {
-      metadata: { isLoading: true, error: null }
+      metadata: { 
+        ...this.videos.get(videoId)?.metadata || {
+          totalMilestones: 0,
+          totalQuestions: 0,
+          questionsPerMilestone: new Map(),
+          lastUpdated: new Date()
+        },
+        isLoading: true, 
+        error: null 
+      }
     })
     
     try {
@@ -186,6 +201,12 @@ class VideoStateManager {
     } catch (error: any) {
       this.updateVideoState(videoId, {
         metadata: { 
+          ...this.videos.get(videoId)?.metadata || {
+            totalMilestones: 0,
+            totalQuestions: 0,
+            questionsPerMilestone: new Map(),
+            lastUpdated: new Date()
+          },
           isLoading: false, 
           error: error.message || 'Failed to load video' 
         }
@@ -249,9 +270,11 @@ class VideoStateManager {
       milestones,
       questions,
       metadata: {
+        ...current.metadata,
         totalMilestones: milestones.length,
         totalQuestions,
-        questionsPerMilestone
+        questionsPerMilestone,
+        lastUpdated: new Date()
       }
     })
   }
@@ -301,8 +324,10 @@ class VideoStateManager {
       milestones,
       questions,
       metadata: {
+        ...current.metadata,
         totalQuestions,
-        questionsPerMilestone
+        questionsPerMilestone,
+        lastUpdated: new Date()
       }
     })
   }
@@ -343,8 +368,10 @@ class VideoStateManager {
       milestones,
       questions,
       metadata: {
+        ...current.metadata,
         totalQuestions,
-        questionsPerMilestone
+        questionsPerMilestone,
+        lastUpdated: new Date()
       }
     })
   }
@@ -381,8 +408,10 @@ class VideoStateManager {
       milestones,
       questions,
       metadata: {
+        ...state.metadata,
         totalQuestions,
-        questionsPerMilestone
+        questionsPerMilestone,
+        lastUpdated: new Date()
       }
     })
   }
@@ -392,21 +421,26 @@ class VideoStateManager {
     try {
       const session = await sessionService.startSession(videoId)
       
-      const milestoneProgress = new Set(
-        (session.milestoneProgress || []).map(mp => mp.milestoneId)
+      const milestoneProgress = new Set<string>(
+        (session.milestoneProgress || []).map((mp: any) => mp.milestoneId)
       )
       
       const questionAnswers = new Map<string, QuestionAnswer>()
       let correctAnswers = 0
       
-      for (const answer of (session.questionAnswers || [])) {
-        questionAnswers.set(answer.questionId, answer)
-        if (answer.isCorrect) correctAnswers++
+      for (const attempt of (session.questionAttempts || [])) {
+        const answer: QuestionAnswer = {
+          questionId: attempt.questionId,
+          answer: attempt.studentAnswer,
+          isCorrect: attempt.isCorrect || false
+        }
+        questionAnswers.set(attempt.questionId, answer)
+        if (attempt.isCorrect) correctAnswers++
       }
       
       const videoState = await this.loadVideo(videoId)
       const completionPercentage = videoState.video.duration 
-        ? Math.round((session.currentTime / videoState.video.duration) * 100)
+        ? Math.round((session.currentPosition / videoState.video.duration) * 100)
         : 0
       
       const state: SessionState = {

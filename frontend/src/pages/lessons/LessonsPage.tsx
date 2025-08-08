@@ -51,12 +51,12 @@ export default function LessonsPage() {
     navigate(`/lessons/${lessonId}`)
   }
 
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return 'Unknown'
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+  // const formatDuration = (seconds: number | null) => {
+  //   if (!seconds) return 'Unknown'
+  //   const mins = Math.floor(seconds / 60)
+  //   const secs = seconds % 60
+  //   return `${mins}:${secs.toString().padStart(2, '0')}`
+  // }
 
   if (loading) {
     return (

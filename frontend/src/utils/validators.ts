@@ -3,7 +3,7 @@
  * Handles CUID format validation since database uses CUID instead of UUID
  */
 
-import { ValidationChain, CustomValidator } from 'express-validator';
+import type { ValidationChain, CustomValidator } from 'express-validator';
 import { param, body, query } from 'express-validator';
 
 /**

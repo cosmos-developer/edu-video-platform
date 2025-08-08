@@ -106,12 +106,11 @@ export class AnalyticsService {
       where: {
         id: videoId,
         OR: [
-          { uploadedBy: user.id },
-          { videoGroup: { createdBy: user.id } },
+          { videoGroup: { lesson: { createdById: user.id } } },
           user.role === 'ADMIN' ? {} : {
             videoGroup: {
               OR: [
-                { isPublic: true },
+                { lesson: { isPublic: true } },
                 {
                   videos: {
                     some: {

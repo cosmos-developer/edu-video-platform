@@ -1,6 +1,6 @@
-import React, { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext } from 'react'
+import type { ReactNode } from 'react'
 import { videoStateManager } from '../stores/VideoStateManager'
-import type { VideoStateManager } from '../stores/VideoStateManager'
 
 interface VideoStateContextType {
   manager: typeof videoStateManager

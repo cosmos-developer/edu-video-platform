@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { query } from 'express-validator'
 import { validationResult } from 'express-validator'
 import { validateCUIDParam, validateCUIDQuery } from '../utils/validators'
@@ -15,7 +15,7 @@ router.use(authenticate)
 // GET /api/analytics/video/:videoId/stats - Get video analytics stats
 router.get('/video/:videoId/stats',
   validateCUIDParam('videoId', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -62,7 +62,7 @@ router.get('/video/:videoId/stats',
 router.get('/video/:videoId/progress',
   validateCUIDParam('videoId', 'Invalid video ID'),
   query('timeRange').optional().isIn(['day', 'week', 'month', 'all']).withMessage('Invalid time range'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -108,7 +108,7 @@ router.get('/student/:studentId/progress',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
   validateCUIDParam('studentId', 'Invalid student ID'),
   validateCUIDQuery('videoGroupId', 'Invalid video group ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -153,7 +153,7 @@ router.get('/student/:studentId/progress',
 router.get('/lesson/:lessonId/overview',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
   validateCUIDParam('lessonId', 'Invalid lesson ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -192,7 +192,7 @@ router.get('/lesson/:lessonId/overview',
 // GET /api/analytics/dashboard/teacher - Get teacher dashboard analytics
 router.get('/dashboard/teacher',
   // roleMiddleware(['TEACHER', 'ADMIN']), // TODO: Create this middleware
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const dashboardData = await AnalyticsService.getTeacherDashboard(req.user!)
 
@@ -213,7 +213,7 @@ router.get('/dashboard/teacher',
 
 // GET /api/analytics/dashboard/student - Get student dashboard analytics
 router.get('/dashboard/student',
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const dashboardData = await AnalyticsService.getStudentDashboard(req.user!)
 
@@ -235,7 +235,7 @@ router.get('/dashboard/student',
 // GET /api/analytics/engagement/heatmap/:videoId - Get engagement heatmap for video
 router.get('/engagement/heatmap/:videoId',
   validateCUIDParam('videoId', 'Invalid video ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -274,7 +274,7 @@ router.get('/engagement/heatmap/:videoId',
 // GET /api/analytics/questions/:milestoneId/performance - Get question performance analytics
 router.get('/questions/:milestoneId/performance',
   validateCUIDParam('milestoneId', 'Invalid milestone ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {

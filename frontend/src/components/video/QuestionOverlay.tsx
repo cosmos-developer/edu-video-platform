@@ -14,7 +14,7 @@ export function QuestionOverlay({
 }: QuestionOverlayProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState('')
-  const [selectedAnswerText, setSelectedAnswerText] = useState('') // For display purposes
+  const [_selectedAnswerText, setSelectedAnswerText] = useState('') // For display purposes
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{
     isCorrect: boolean
@@ -230,7 +230,7 @@ export function QuestionOverlay({
           {/* Question */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              {currentQuestion.text || currentQuestion.question}
+              {currentQuestion.text || (currentQuestion as any).question}
             </h3>
             {renderQuestionContent()}
           </div>

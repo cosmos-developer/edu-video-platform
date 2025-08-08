@@ -275,8 +275,11 @@ Important: Return only valid JSON. No additional text or markdown formatting.
         data: {
           milestoneId,
           type: questionData.type,
-          question: questionData.question,
-          correctAnswer: questionData.correctAnswer,
+          text: questionData.question,
+          questionData: {
+            correctAnswer: questionData.correctAnswer,
+            options: questionData.options || []
+          },
           explanation: questionData.explanation || null
         }
       })
@@ -313,7 +316,8 @@ Important: Return only valid JSON. No additional text or markdown formatting.
         timestamp: suggestedTimestamp,
         title: generatedContent.milestoneTitle,
         description: generatedContent.milestoneDescription || null,
-        type: 'QUIZ'
+        type: 'QUIZ',
+        order: 0 // Default order, should be updated based on existing milestones
       }
     })
 
@@ -324,8 +328,11 @@ Important: Return only valid JSON. No additional text or markdown formatting.
         data: {
           milestoneId: milestone.id,
           type: questionData.type,
-          question: questionData.question,
-          correctAnswer: questionData.correctAnswer,
+          text: questionData.question,
+          questionData: {
+            correctAnswer: questionData.correctAnswer,
+            options: questionData.options || []
+          },
           explanation: questionData.explanation || null
         }
       })

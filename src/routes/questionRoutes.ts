@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { body } from 'express-validator'
 import { validationResult } from 'express-validator'
 import { validateCUIDParam, validateCUIDBody } from '../utils/validators'
@@ -22,7 +22,7 @@ router.post('/',
   body('points').optional().isInt({ min: 1 }).withMessage('Points must be a positive integer'),
   body('passThreshold').optional().isFloat({ min: 0, max: 1 }).withMessage('Pass threshold must be between 0 and 1'),
   body('questionData').notEmpty().withMessage('Question data is required'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -88,7 +88,7 @@ router.post('/',
 // GET /api/questions/milestone/:milestoneId - Get all questions for a milestone
 router.get('/milestone/:milestoneId',
   validateCUIDParam('milestoneId', 'Invalid milestone ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -127,7 +127,7 @@ router.get('/milestone/:milestoneId',
 // GET /api/questions/:id - Get specific question
 router.get('/:id',
   validateCUIDParam('id', 'Invalid question ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -172,7 +172,7 @@ router.put('/:id',
   body('points').optional().isInt({ min: 1 }).withMessage('Points must be a positive integer'),
   body('passThreshold').optional().isFloat({ min: 0, max: 1 }).withMessage('Pass threshold must be between 0 and 1'),
   body('status').optional().isIn(['DRAFT', 'APPROVED', 'ARCHIVED']).withMessage('Invalid status'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -241,7 +241,7 @@ router.put('/:id',
 // DELETE /api/questions/:id - Delete question (creator or admin only)
 router.delete('/:id',
   validateCUIDParam('id', 'Invalid question ID'),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
@@ -288,7 +288,7 @@ router.delete('/:id',
 router.post('/:id/approve',
   validateCUIDParam('id', 'Invalid question ID'),
   body('reviewNotes').optional().trim(),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
       if (!errors.isEmpty()) {

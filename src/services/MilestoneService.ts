@@ -160,9 +160,8 @@ export class MilestoneService {
       throw new Error('Milestone not found')
     }
 
-    // Check permissions - only video uploader, lesson creator, or admin can update milestones
+    // Check permissions - only lesson creator or admin can update milestones
     if (
-      existingMilestone.video.uploadedBy !== user.id && 
       existingMilestone.video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
@@ -213,7 +212,11 @@ export class MilestoneService {
       include: {
         video: {
           include: {
-            videoGroup: true
+            videoGroup: {
+              include: {
+                lesson: true
+              }
+            }
           }
         }
       }
@@ -223,9 +226,8 @@ export class MilestoneService {
       throw new Error('Milestone not found')
     }
 
-    // Check permissions - only video uploader, lesson creator, or admin can delete milestones
+    // Check permissions - only lesson creator or admin can delete milestones
     if (
-      existingMilestone.video.uploadedBy !== user.id && 
       existingMilestone.video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
@@ -260,9 +262,8 @@ export class MilestoneService {
       throw new Error('Milestone not found')
     }
 
-    // Check permissions - only video uploader, lesson creator, or admin can add questions
+    // Check permissions - only lesson creator or admin can add questions
     if (
-      milestone.video.uploadedBy !== user.id && 
       milestone.video.videoGroup.lesson.createdById !== user.id && 
       user.role !== 'ADMIN'
     ) {
@@ -283,9 +284,6 @@ export class MilestoneService {
         passThreshold: data.passThreshold || 0.7,
         createdById: user.id,
         status: 'DRAFT' // Default to draft status for manual creation
-      },
-      include: {
-        questionData: true
       }
     })
 
