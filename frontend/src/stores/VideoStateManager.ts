@@ -537,7 +537,14 @@ class VideoStateManager {
       milestoneId
     })
     
-    state.questionAnswers.set(questionId, result)
+    // Create QuestionAnswer from the result
+    const questionAnswer: QuestionAnswer = {
+      questionId,
+      answer,
+      isCorrect: result.isCorrect
+    }
+    
+    state.questionAnswers.set(questionId, questionAnswer)
     
     const correctAnswers = Array.from(state.questionAnswers.values())
       .filter(a => a.isCorrect).length
@@ -557,7 +564,7 @@ class VideoStateManager {
     
     return {
       isCorrect: result.isCorrect,
-      explanation: undefined // API doesn't return explanation in QuestionAnswer
+      explanation: result.explanation
     }
   }
   

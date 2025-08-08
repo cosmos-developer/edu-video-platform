@@ -14,11 +14,12 @@ interface QuestionEditorProps {
 export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated }: QuestionEditorProps) {
   const manager = useVideoStateManager()
   const { questions: allQuestions } = useVideoState(videoId)
-  const [questions, setQuestions] = useState(allQuestions?.get(milestone.id) || [])
+  // Use questions from VideoStateManager, not local state
+  const questions = allQuestions?.get(milestone.id) || []
   const [showAddForm, setShowAddForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [loadingQuestions, setLoadingQuestions] = useState(true)
+  const [loadingQuestions, setLoadingQuestions] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [previewAnswer, setPreviewAnswer] = useState('')
 
@@ -30,24 +31,13 @@ export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated
     options: ['', '', '', ''] // For multiple choice
   })
 
-  // Load questions when component mounts
+  // Load video state if needed when component mounts
   useEffect(() => {
-    loadQuestions()
-  }, [milestone.id])
-
-  const loadQuestions = async () => {
-    setLoadingQuestions(true)
-    try {
-      const loadedQuestions = await questionService.getQuestionsByMilestone(milestone.id)
-      setQuestions(loadedQuestions || [])
-    } catch (err: any) {
-      console.error('Error loading questions:', err)
-      // Fall back to milestone questions if API fails
-      setQuestions(milestone.questions || [])
-    } finally {
-      setLoadingQuestions(false)
+    if (videoId && !allQuestions) {
+      // VideoStateManager will load the video data if not cached
+      manager.loadVideo(videoId)
     }
-  }
+  }, [videoId, allQuestions, manager])
 
   const resetForm = () => {
     setFormData({
