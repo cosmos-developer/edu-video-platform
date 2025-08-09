@@ -12,7 +12,7 @@ class JWTService {
       userId: user.id,
       email: user.email,
       role: user.role,
-      tenantId: user.tenantId,
+      ...(user.tenantId && { tenantId: user.tenantId })
     };
 
     return jwt.sign(payload, environment.jwt.secret, {
@@ -30,7 +30,7 @@ class JWTService {
       userId: user.id,
       email: user.email,
       role: user.role,
-      tenantId: user.tenantId,
+      ...(user.tenantId && { tenantId: user.tenantId })
     };
 
     return jwt.sign(payload, environment.jwt.refreshSecret, {

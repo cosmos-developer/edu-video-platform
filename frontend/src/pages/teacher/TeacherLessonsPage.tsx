@@ -93,7 +93,11 @@ export default function TeacherLessonsPage() {
     
     // Confirm deletion
     const confirmed = confirm(
-      `Are you sure you want to delete "${lessonTitle}"?\n\nThis action cannot be undone and will permanently remove the lesson and all its content.\n\nNote: Lessons with student progress cannot be deleted and must be archived instead.`
+      `Are you sure you want to delete "${lessonTitle}"?
+
+This action cannot be undone and will permanently remove the lesson and all its content.
+
+Note: Lessons with student progress cannot be deleted and must be archived instead.`
     )
     
     if (!confirmed) return
@@ -103,8 +107,31 @@ export default function TeacherLessonsPage() {
       loadLessons() // Refresh the list
     } catch (err: any) {
       console.error('Error deleting lesson:', err)
-      // Show error notification (you could add a toast here)
-      alert(err.message || 'Failed to delete lesson')
+      
+      // Check if it's because of student progress
+      if (err.response?.data?.error?.includes('student progress')) {
+        const archiveConfirmed = confirm(
+          `This lesson has existing student progress and cannot be deleted.
+
+Would you like to archive it instead?
+
+Archived lessons are hidden from students but preserve all learning data.`
+        )
+        
+        if (archiveConfirmed) {
+          try {
+            await lessonService.archiveLesson(lessonId)
+            loadLessons() // Refresh the list
+            alert('Lesson archived successfully')
+          } catch (archiveErr: any) {
+            console.error('Error archiving lesson:', archiveErr)
+            alert(archiveErr.message || 'Failed to archive lesson')
+          }
+        }
+      } else {
+        // Show other errors
+        alert(err.response?.data?.error || err.message || 'Failed to delete lesson')
+      }
     }
   }
 

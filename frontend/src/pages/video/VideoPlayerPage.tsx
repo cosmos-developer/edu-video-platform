@@ -5,6 +5,7 @@ import { sessionService } from '../../services/video'
 import type { VideoSession } from '../../services/video'
 import { useVideoState, useSessionState } from '../../hooks/useVideoState'
 import { useVideoStateManager } from '../../contexts/VideoStateContext'
+import { ProgressCalculator } from '../../utils/progressCalculator'
 
 export default function VideoPlayerPage() {
   const { videoId } = useParams<{ videoId: string }>()
@@ -13,8 +14,35 @@ export default function VideoPlayerPage() {
   
   // Use unified state
   const { video, loading: videoLoading, error: videoError } = useVideoState(videoId)
+  console.log('🎬 VideoPlayerPage - video state:', { video: video?.id, loading: videoLoading, error: videoError, duration: video?.duration })
+  console.log('🎬 Full video object:', video)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const { session, metadata: sessionMeta } = useSessionState(sessionId || undefined)
+  console.log('📊 Session data:', { sessionId, session: session?.id, status: session?.status, currentPosition: session?.currentPosition, milestones: session?.milestoneProgress?.length, attempts: session?.questionAttempts?.length, sessionMeta })
+  
+  // Track when component re-renders
+  console.log('🔄 VideoPlayerPage re-render:', { 
+    videoId, 
+    videoLoaded: !!video, 
+    videoDuration: video?.duration,
+    sessionLoaded: !!session, 
+    sessionPosition: session?.currentPosition,
+    sessionStatus: session?.status,
+    timestamp: new Date().toISOString() 
+  })
+  
+  // Debug what we're passing to ProgressCalculator
+  console.log('🔍 About to call ProgressCalculator with:', {
+    video: video ? { id: video.id, duration: video.duration } : null,
+    session: session ? { id: session.id, currentPosition: session.currentPosition, status: session.status } : null,
+    sessionMeta
+  })
+  
+  // Let's also see what progress is being calculated each time
+  if (video || session) {
+    const progressData = ProgressCalculator.calculateAllProgress(session, video, sessionMeta)
+    console.log('📊 Calculated progress data:', progressData)
+  }
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +55,29 @@ export default function VideoPlayerPage() {
     }
 
     loadVideo()
+    loadSession()
   }, [videoId])
+
+  const loadSession = async () => {
+    if (!videoId) return
+
+    try {
+      console.log('🔍 Loading existing session for video:', videoId)
+      const sessionResponse = await sessionService.getSessionByVideo(videoId)
+      if (sessionResponse) {
+        console.log('📊 Found existing session:', sessionResponse.id, sessionResponse)
+        setSessionId(sessionResponse.id)
+        
+        // Trigger session state in VideoStateManager by calling startOrResumeSession
+        // This will load the session data properly into the state manager
+        await manager.startOrResumeSession(videoId)
+      } else {
+        console.log('❌ No existing session found')
+      }
+    } catch (sessionError) {
+      console.log('❌ Error loading session:', sessionError)
+    }
+  }
 
   const loadVideo = async () => {
     if (!videoId) return
@@ -38,18 +88,6 @@ export default function VideoPlayerPage() {
     try {
       // Load video through VideoStateManager
       await manager.loadVideo(videoId)
-
-      // Load existing session
-      try {
-        const sessionResponse = await sessionService.getSessionByVideo(videoId)
-        if (sessionResponse) {
-          setSessionId(sessionResponse.id)
-        }
-      } catch (sessionError) {
-        // Session might not exist yet, that's OK
-        console.log('No existing session found')
-      }
-
     } catch (err: any) {
       console.error('Error loading video:', err)
       setError(err.message || 'Failed to load video')
@@ -209,38 +247,36 @@ export default function VideoPlayerPage() {
         </div>
       )}
       
-      {/* Learning Progress - Use unified state metadata */}
-      {(session || sessionMeta) && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {sessionMeta?.completionPercentage || 
-               (session?.status === 'COMPLETED' ? '100' : 
-                Math.round((session?.currentPosition || 0) / (video?.duration || 1) * 100))}%
+      {/* Learning Progress - Always show, even with no session */}
+      {(() => {
+        const progressData = ProgressCalculator.calculateAllProgress(session, video, sessionMeta)
+        
+        return (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {progressData.completionPercentage}%
+              </div>
+              <div className="text-sm text-gray-600 mt-1">Progress</div>
             </div>
-            <div className="text-sm text-gray-600 mt-1">Progress</div>
-          </div>
-          
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {session?.milestoneProgress?.length || 0}
+            
+            <div className="card text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {progressData.milestonesReached}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">Milestones Reached</div>
             </div>
-            <div className="text-sm text-gray-600 mt-1">Milestones Reached</div>
-          </div>
-          
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {sessionMeta?.correctAnswers || 
-               session?.questionAttempts?.filter((qa: any) => qa.isCorrect).length || 0}
-              <span className="text-sm text-gray-500">/
-                {sessionMeta?.totalAnswers || 
-                 session?.questionAttempts?.length || 0}
-              </span>
+            
+            <div className="card text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {progressData.correctAnswers}
+                <span className="text-sm text-gray-500">/{progressData.totalAnswers}</span>
+              </div>
+              <div className="text-sm text-gray-600 mt-1">Correct Answers</div>
             </div>
-            <div className="text-sm text-gray-600 mt-1">Correct Answers</div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Interactive Video Player */}
       <VideoPlayer

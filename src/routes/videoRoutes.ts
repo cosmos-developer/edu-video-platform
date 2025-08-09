@@ -363,9 +363,19 @@ router.get('/:id',
         })
       }
 
+      // Convert BigInt fields to strings for JSON serialization
+      const serializedVideo = {
+        ...video,
+        size: video.size ? video.size.toString() : null,
+        milestones: video.milestones ? video.milestones.map(milestone => ({
+          ...milestone,
+          timestamp: milestone.timestamp ? milestone.timestamp.toString() : '0'
+        })) : []
+      }
+
       res.json({
         success: true,
-        data: video
+        data: serializedVideo
       })
 
     } catch (error) {
@@ -431,6 +441,46 @@ router.put('/:id',
       res.status(500).json({
         success: false,
         error: 'Failed to update video'
+      })
+    }
+  }
+)
+
+// POST /api/videos/:id/process - Process video to extract metadata (uploader or admin only)
+router.post('/:id/process',
+  validateCUIDParam('id', 'Invalid video ID'),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        })
+      }
+
+      const video = await VideoService.processVideoMetadata(req.params.id)
+
+      res.json({
+        success: true,
+        data: video,
+        message: 'Video metadata processed successfully'
+      })
+
+    } catch (error: any) {
+      console.error('Error processing video metadata:', error)
+      
+      if (error.message === 'Video not found') {
+        return res.status(404).json({
+          success: false,
+          error: 'Video not found'
+        })
+      }
+      
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process video metadata'
       })
     }
   }

@@ -31,7 +31,6 @@ export default function LessonsPage() {
       }
       
       const response = await lessonService.getLessons(params)
-
       setLessons(response?.items || [])
     } catch (err: any) {
       console.error('Error loading lessons:', err)

@@ -30,9 +30,18 @@ router.post('/start',
         req.user!.id
       )
 
+      // Convert BigInt fields to strings for JSON serialization
+      const serializedSession = session ? {
+        ...session,
+        video: session.video ? {
+          ...session.video,
+          size: session.video.size ? session.video.size.toString() : null
+        } : undefined
+      } : null
+
       res.json({
         success: true,
-        data: session,
+        data: serializedSession,
         message: 'Video session started'
       })
 
@@ -81,9 +90,18 @@ router.put('/:sessionId/progress',
         req.user!.id
       )
 
+      // Convert BigInt fields to strings for JSON serialization
+      const serializedSession = session ? {
+        ...session,
+        video: session.video ? {
+          ...session.video,
+          size: session.video.size ? session.video.size.toString() : null
+        } : undefined
+      } : null
+
       res.json({
         success: true,
-        data: session,
+        data: serializedSession,
         message: 'Progress updated'
       })
 
@@ -267,9 +285,18 @@ router.put('/:sessionId/complete',
         req.user!.id
       )
 
+      // Convert BigInt fields to strings for JSON serialization
+      const serializedSession = session ? {
+        ...session,
+        video: session.video ? {
+          ...session.video,
+          size: session.video.size ? session.video.size.toString() : null
+        } : undefined
+      } : null
+
       res.json({
         success: true,
-        data: session,
+        data: serializedSession,
         message: 'Session completed successfully'
       })
 
@@ -312,14 +339,24 @@ router.get('/video/:videoId',
         })
       }
 
+      console.log('Fetching session for video:', req.params.videoId, 'user:', req.user!.id)
       const session = await VideoSessionService.getSessionByVideo(
         req.params.videoId,
         req.user!.id
       )
 
+      // Convert BigInt fields to strings for JSON serialization
+      const serializedSession = session ? {
+        ...session,
+        video: session.video ? {
+          ...session.video,
+          size: session.video.size ? session.video.size.toString() : null
+        } : undefined
+      } : null
+      
       res.json({
         success: true,
-        data: session
+        data: serializedSession
       })
 
     } catch (error: any) {

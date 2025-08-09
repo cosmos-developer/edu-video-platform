@@ -1,117 +1,350 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import type { AuthContextType, AuthTokens, LoginCredentials, RegisterData, User } from '../types/auth'
+import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react'
+import type { User, LoginCredentials, RegisterData } from '../types/auth'
 import { authService } from '../services/auth'
+import TokenManager from '../services/tokenManager'
 
+// Auth State
+interface AuthState {
+  user: User | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  isInitialized: boolean
+  error: string | null
+}
+
+// Auth Actions
+type AuthAction =
+  | { type: 'LOGIN_START' }
+  | { type: 'LOGIN_SUCCESS'; payload: User }
+  | { type: 'LOGIN_ERROR'; payload: string }
+  | { type: 'LOGOUT' }
+  | { type: 'RESTORE_SESSION'; payload: User }
+  | { type: 'SESSION_EXPIRED' }
+  | { type: 'SET_ERROR'; payload: string }
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'INITIALIZED' }
+  | { type: 'REFRESH_START' }
+  | { type: 'REFRESH_SUCCESS'; payload: User }
+  | { type: 'REFRESH_ERROR' }
+
+// Initial State
+const initialState: AuthState = {
+  user: null,
+  isAuthenticated: false,
+  isLoading: false,
+  isInitialized: false,
+  error: null
+}
+
+// Reducer
+function authReducer(state: AuthState, action: AuthAction): AuthState {
+  switch (action.type) {
+    case 'LOGIN_START':
+    case 'REFRESH_START':
+      return { ...state, isLoading: true, error: null }
+    
+    case 'LOGIN_SUCCESS':
+    case 'REFRESH_SUCCESS':
+      return {
+        ...state,
+        user: action.payload,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null
+      }
+    
+    case 'LOGIN_ERROR':
+      return {
+        ...state,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: action.payload
+      }
+    
+    case 'LOGOUT':
+    case 'SESSION_EXPIRED':
+      return {
+        ...state,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: action.type === 'SESSION_EXPIRED' ? 'Your session has expired' : null
+      }
+    
+    case 'RESTORE_SESSION':
+      return {
+        ...state,
+        user: action.payload,
+        isAuthenticated: true,
+        isInitialized: true
+      }
+    
+    case 'SET_ERROR':
+      return { ...state, error: action.payload }
+    
+    case 'CLEAR_ERROR':
+      return { ...state, error: null }
+    
+    case 'INITIALIZED':
+      return { ...state, isInitialized: true }
+    
+    case 'REFRESH_ERROR':
+      return { ...state, isLoading: false }
+    
+    default:
+      return state
+  }
+}
+
+// Context Type
+interface AuthContextType {
+  state: AuthState
+  actions: {
+    login: (credentials: LoginCredentials) => Promise<void>
+    register: (data: RegisterData) => Promise<void>
+    logout: () => void
+    refreshAuth: () => Promise<void>
+    clearError: () => void
+  }
+}
+
+// Create Context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Auth Provider Component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [tokens, setTokens] = useState<AuthTokens | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [state, dispatch] = useReducer(authReducer, initialState)
+  const refreshInProgress = useRef(false)
 
+  // Initialize auth on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedTokens = authService.getStoredTokens()
+      console.log('Initializing auth...')
       
-      if (storedTokens) {
+      // Initialize token manager
+      TokenManager.initialize()
+      
+      // Try to restore session if token is valid
+      if (TokenManager.isTokenValid()) {
         try {
-          // Try to get current user with stored tokens
-          const currentUser = await authService.getCurrentUser()
-          if (currentUser) {
-            setUser(currentUser)
-            setTokens(storedTokens)
+          const user = await authService.getCurrentUser()
+          if (user) {
+            console.log('Session restored for user:', user.email)
+            dispatch({ type: 'RESTORE_SESSION', payload: user })
           } else {
-            // Invalid tokens, clear them
-            authService.logout()
+            console.log('Failed to restore session - clearing tokens')
+            TokenManager.clearTokens()
           }
         } catch (error) {
-          // Error getting user, clear tokens
-          authService.logout()
+          console.error('Failed to restore session:', error)
+          TokenManager.clearTokens()
         }
+      } else {
+        console.log('No valid token found')
       }
       
-      setIsLoading(false)
+      dispatch({ type: 'INITIALIZED' })
     }
 
     initializeAuth()
   }, [])
 
-  const login = async (credentials: LoginCredentials): Promise<void> => {
-    setIsLoading(true)
+  // Handle token refresh events
+  useEffect(() => {
+    const handleTokenRefresh = async () => {
+      if (refreshInProgress.current) return
+      
+      refreshInProgress.current = true
+      dispatch({ type: 'REFRESH_START' })
+      
+      try {
+        const success = await authService.refreshToken()
+        if (success) {
+          const user = await authService.getCurrentUser()
+          if (user) {
+            dispatch({ type: 'REFRESH_SUCCESS', payload: user })
+          } else {
+            dispatch({ type: 'SESSION_EXPIRED' })
+          }
+        } else {
+          dispatch({ type: 'SESSION_EXPIRED' })
+        }
+      } catch (error) {
+        console.error('Token refresh failed:', error)
+        dispatch({ type: 'SESSION_EXPIRED' })
+      } finally {
+        refreshInProgress.current = false
+      }
+    }
+
+    const handleAuthExpired = () => {
+      dispatch({ type: 'SESSION_EXPIRED' })
+      TokenManager.clearTokens()
+    }
+
+    const handleTokensUpdated = async () => {
+      // Another tab updated tokens, refresh our state
+      if (TokenManager.isTokenValid()) {
+        try {
+          const user = await authService.getCurrentUser()
+          if (user) {
+            dispatch({ type: 'RESTORE_SESSION', payload: user })
+          }
+        } catch (error) {
+          console.error('Failed to sync auth state:', error)
+        }
+      }
+    }
+
+    const handleTokensCleared = () => {
+      // Another tab logged out
+      dispatch({ type: 'LOGOUT' })
+    }
+
+    // Listen for auth events
+    window.addEventListener('auth:token-refresh-needed', handleTokenRefresh)
+    window.addEventListener('auth:expired', handleAuthExpired)
+    window.addEventListener('auth:tokens-updated', handleTokensUpdated)
+    window.addEventListener('auth:tokens-cleared', handleTokensCleared)
+
+    return () => {
+      window.removeEventListener('auth:token-refresh-needed', handleTokenRefresh)
+      window.removeEventListener('auth:expired', handleAuthExpired)
+      window.removeEventListener('auth:tokens-updated', handleTokensUpdated)
+      window.removeEventListener('auth:tokens-cleared', handleTokensCleared)
+    }
+  }, [])
+
+  // Handle storage changes (cross-tab sync)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'accessToken') {
+        if (e.newValue === null) {
+          // Token removed in another tab
+          dispatch({ type: 'LOGOUT' })
+        } else if (e.oldValue === null && e.newValue !== null) {
+          // Token added in another tab (login)
+          window.location.reload() // Simple reload to sync state
+        }
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
+  // Actions
+  const login = useCallback(async (credentials: LoginCredentials) => {
+    dispatch({ type: 'LOGIN_START' })
+    
     try {
       const response = await authService.login(credentials)
       
       if (response.success && response.data) {
-        setUser(response.data.user)
-        setTokens(response.data.tokens)
+        dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user })
       } else {
+        dispatch({ type: 'LOGIN_ERROR', payload: response.error || 'Login failed' })
         throw new Error(response.error || 'Login failed')
       }
-    } catch (error) {
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.message || 'Login failed'
+      dispatch({ type: 'LOGIN_ERROR', payload: message })
       throw error
-    } finally {
-      setIsLoading(false)
     }
-  }
+  }, [])
 
-  const register = async (data: RegisterData): Promise<void> => {
-    setIsLoading(true)
+  const register = useCallback(async (data: RegisterData) => {
+    dispatch({ type: 'LOGIN_START' })
+    
     try {
       const response = await authService.register(data)
       
       if (response.success && response.data) {
-        setUser(response.data.user)
-        setTokens(response.data.tokens)
+        dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user })
       } else {
+        dispatch({ type: 'LOGIN_ERROR', payload: response.error || 'Registration failed' })
         throw new Error(response.error || 'Registration failed')
       }
-    } catch (error) {
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.message || 'Registration failed'
+      dispatch({ type: 'LOGIN_ERROR', payload: message })
       throw error
-    } finally {
-      setIsLoading(false)
     }
-  }
+  }, [])
 
-  const logout = (): void => {
+  const logout = useCallback(() => {
     authService.logout()
-    setUser(null)
-    setTokens(null)
-  }
+    dispatch({ type: 'LOGOUT' })
+  }, [])
 
-  const refreshToken = async (): Promise<void> => {
+  const refreshAuth = useCallback(async () => {
+    if (refreshInProgress.current) return
+    
+    refreshInProgress.current = true
+    dispatch({ type: 'REFRESH_START' })
+    
     try {
       const success = await authService.refreshToken()
-      if (!success) {
-        logout()
-      } else {
-        // Update tokens state
-        const newTokens = authService.getStoredTokens()
-        if (newTokens) {
-          setTokens(newTokens)
+      if (success) {
+        const user = await authService.getCurrentUser()
+        if (user) {
+          dispatch({ type: 'REFRESH_SUCCESS', payload: user })
+        } else {
+          dispatch({ type: 'SESSION_EXPIRED' })
         }
+      } else {
+        dispatch({ type: 'SESSION_EXPIRED' })
       }
     } catch (error) {
-      logout()
+      console.error('Manual refresh failed:', error)
+      dispatch({ type: 'REFRESH_ERROR' })
+    } finally {
+      refreshInProgress.current = false
     }
-  }
+  }, [])
+
+  const clearError = useCallback(() => {
+    dispatch({ type: 'CLEAR_ERROR' })
+  }, [])
 
   const contextValue: AuthContextType = {
-    user,
-    tokens,
-    isLoading,
-    login,
-    register,
-    logout,
-    refreshToken,
+    state,
+    actions: {
+      login,
+      register,
+      logout,
+      refreshAuth,
+      clearError
+    }
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
+// Hook to use auth context
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
+}
+
+// Hook for checking specific roles
+export function useRole(requiredRole: string): boolean {
+  const { state: { user } } = useAuth()
+  return user?.role === requiredRole
+}
+
+// Hook for auth status
+export function useAuthStatus() {
+  const { state } = useAuth()
+  return {
+    isAuthenticated: state.isAuthenticated,
+    isLoading: state.isLoading,
+    isInitialized: state.isInitialized,
+    user: state.user,
+    error: state.error
+  }
 }

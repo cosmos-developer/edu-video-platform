@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { VideoStateProvider } from './contexts/VideoStateContext'
-import { useAuth } from './hooks/useAuth'
+import { ProtectedRoute, PublicRoute } from './components/auth/ProtectedRoute'
+import { AuthErrorBoundary } from './components/auth/AuthErrorBoundary'
 import Layout from './components/layout/Layout'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
@@ -13,7 +14,6 @@ import VideoPlayerPage from './pages/video/VideoPlayerPage'
 import CreateLessonPage from './pages/teacher/CreateLessonPage'
 import TeacherLessonsPage from './pages/teacher/TeacherLessonsPage'
 import LessonManagementPage from './pages/teacher/LessonManagementPage'
-import LoadingSpinner from './components/ui/LoadingSpinner'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -25,42 +25,17 @@ const queryClient = new QueryClient({
   },
 })
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth()
-
-  if (isLoading) {
-    return <LoadingSpinner />
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  return <>{children}</>
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth()
-
-  if (isLoading) {
-    return <LoadingSpinner />
-  }
-
-  if (user) {
-    return <Navigate to="/dashboard" replace />
-  }
-
-  return <>{children}</>
-}
+// Remove old ProtectedRoute and PublicRoute components - they're now imported
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <VideoStateProvider>
-          <Router>
-            <div className="min-h-screen bg-gray-50">
-              <Routes>
+        <AuthErrorBoundary>
+          <VideoStateProvider>
+            <Router>
+              <div className="min-h-screen bg-gray-50">
+                <Routes>
               {/* Public Routes */}
               <Route 
                 path="/login" 
@@ -103,6 +78,7 @@ function App() {
           </div>
         </Router>
       </VideoStateProvider>
+      </AuthErrorBoundary>
       </AuthProvider>
     </QueryClientProvider>
   )

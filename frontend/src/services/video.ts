@@ -224,9 +224,7 @@ export const videoService = {
       `/videos/groups/${groupId}/videos`,
       formData,
       {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // Don't set Content-Type header - axios will set it with boundary
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
@@ -495,8 +493,13 @@ export const sessionService = {
 
   // Get session for video
   async getSessionByVideo(videoId: string) {
-    const response = await apiService.get<ApiResponse<VideoSession | null>>(`/sessions/video/${videoId}`)
-    return (response as any).data
+    try {
+      const response = await apiService.get<ApiResponse<VideoSession | null>>(`/sessions/video/${videoId}`)
+      return response.data
+    } catch (error) {
+      console.log('No existing session for video:', videoId)
+      return null
+    }
   },
 
   // Get user sessions
