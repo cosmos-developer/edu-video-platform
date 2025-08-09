@@ -47,16 +47,19 @@ interface GetVideoGroupsOptions {
   limit: number
   search: string
   userId: string
+  lessonId?: string
 }
 
 export class VideoService {
   static async getVideoGroups(options: GetVideoGroupsOptions) {
-    const { page, limit, search, userId } = options
+    const { page, limit, search, userId, lessonId } = options
     const offset = (page - 1) * limit
 
     // Build where clause for search and access control
     const whereClause = {
       AND: [
+        // Filter by lessonId if provided
+        lessonId ? { lessonId } : {},
         // Access control through lesson relationship
         {
           lesson: {

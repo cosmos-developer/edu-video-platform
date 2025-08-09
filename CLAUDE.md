@@ -67,6 +67,19 @@ npm run lint
 npm run typecheck
 ```
 
+## Troubleshooting & Common Issues
+
+**📋 For recurring development issues, see:** [`docs/COMMON_ERRORS.md`](./docs/COMMON_ERRORS.md)
+
+This document catalogs common errors and their solutions, including:
+- BigInt serialization issues in API responses
+- Prisma query optimization problems
+- Authentication and CORS issues
+- Database migration challenges
+- Memory leaks and performance issues
+
+Always check this guide when encountering errors to save debugging time.
+
 ## Agent Specializations
 
 ### Backend Agent Focus

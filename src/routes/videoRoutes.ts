@@ -80,10 +80,11 @@ router.use((req, res, next) => {
 })
 
 // GET /api/videos - Get all video groups with videos (paginated)
-router.get('/', 
+router.get('/',
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().isString().trim().withMessage('Search must be a string'),
+  query('lessonId').optional().isString().trim().withMessage('Lesson ID must be a string'),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
@@ -98,17 +99,28 @@ router.get('/',
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 10
       const search = req.query.search as string || ''
+      const lessonId = req.query.lessonId as string | undefined
 
       const result = await VideoService.getVideoGroups({
         page,
         limit,
         search,
-        userId: req.user!.id
+        userId: req.user!.id,
+        lessonId
       })
+
+      // Serialize BigInt fields (video.size) to strings
+      const serializedGroups = result.videoGroups.map(group => ({
+        ...group,
+        videos: group.videos?.map(video => ({
+          ...video,
+          size: video.size ? video.size.toString() : null
+        })) || []
+      }))
 
       return res.json({
         success: true,
-        data: result.videoGroups,
+        data: serializedGroups,
         meta: {
           total: result.total,
           page,

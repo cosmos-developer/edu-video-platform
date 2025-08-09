@@ -7,6 +7,56 @@ export interface ApiResponse<T> {
   message?: string
 }
 
+// Video type matching backend response
+export interface Video {
+  id: string
+  videoGroupId: string
+  title: string
+  description: string | null
+  order: number
+  status: string
+  duration: number | null
+  thumbnailPath: string | null
+  thumbnailUrl?: string | null // Computed field for frontend
+  filePath?: string | null // Only for teachers/admins
+  size: string | null
+  mimeType: string | null
+  processingStatus?: string | null // Only for teachers/admins
+  uploadedAt: string
+  _count?: {
+    milestones: number
+  }
+}
+
+// VideoGroup type matching backend response
+export interface VideoGroup {
+  id: string
+  lessonId: string
+  title: string
+  description: string | null
+  order: number
+  createdAt: string
+  updatedAt: string
+  videos: Video[]
+  _count?: {
+    videos: number
+  }
+}
+
+// Student progress type
+export interface StudentProgress {
+  id: string
+  studentId: string
+  lessonId: string
+  isCompleted: boolean
+  completionPercent: number
+  totalTimeSpent: number
+  averageScore: number | null
+  startedAt: string
+  completedAt: string | null
+}
+
+// UNIFIED Lesson interface - always includes videoGroups when fetched by ID
 export interface Lesson {
   id: string
   title: string
@@ -29,7 +79,20 @@ export interface Lesson {
     firstName: string
     lastName: string
     avatar: string | null
+    email?: string
   }
+  // UNIFIED PATTERN: Always includes videoGroups when fetched by ID
+  videoGroups?: VideoGroup[]
+  studentProgress?: StudentProgress[]
+  _count?: {
+    videoGroups: number
+    studentProgress: number
+  }
+}
+
+// Type alias for better clarity
+export type LessonWithVideos = Lesson & {
+  videoGroups: VideoGroup[]
 }
 
 export interface CreateLessonRequest {
@@ -91,14 +154,15 @@ export const lessonService = {
     return response.data
   },
 
-  // Get a specific lesson by ID
-  async getLesson(id: string): Promise<Lesson> {
-    const response = await apiService.get<ApiResponse<Lesson>>(`/lessons/${id}`)
+  // Get a specific lesson by ID - UNIFIED PATTERN: Always returns lesson with videoGroups
+  async getLesson(id: string): Promise<LessonWithVideos> {
+    const response = await apiService.get<ApiResponse<LessonWithVideos>>(`/lessons/${id}`)
     
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch lesson')
     }
     
+    // Response ALWAYS includes videoGroups (teacher pattern)
     return response.data
   },
 

@@ -22,11 +22,19 @@ export interface VideoGroup {
   id: string
   title: string
   description: string | null
-  tags: string[]
-  isPublic: boolean
-  createdBy: string
+  lessonId?: string
+  order?: number
+  tags?: string[]
+  isPublic?: boolean
+  createdBy?: string
   createdAt: string
+  updatedAt?: string
   videos: Video[]
+  lesson?: {
+    id: string
+    title: string
+    createdById: string
+  }
   creator?: {
     id: string
     firstName: string
@@ -42,13 +50,24 @@ export interface Video {
   id: string
   title: string
   description: string | null
-  videoUrl: string
+  videoUrl?: string
+  filePath?: string
+  fileName?: string
   duration: number | null
-  thumbnailUrl: string | null
+  thumbnailUrl?: string | null
+  thumbnailPath?: string | null
   order: number
   videoGroupId: string
-  uploadedBy: string
+  uploadedBy?: string
+  status?: string
+  size?: string | null
+  mimeType?: string | null
+  processingStatus?: string
+  metadata?: any
   createdAt: string
+  updatedAt?: string
+  uploadedAt?: string
+  processedAt?: string | null
   milestones?: Milestone[]
   videoGroup?: {
     id: string
@@ -63,7 +82,8 @@ export interface Video {
   }
   _count?: {
     milestones: number
-    videoSessions: number
+    studentSessions?: number
+    videoSessions?: number
   }
 }
 
@@ -158,14 +178,26 @@ export const videoService = {
     page?: number
     limit?: number
     search?: string
+    lessonId?: string
   } = {}) {
     const searchParams = new URLSearchParams()
     if (params.page) searchParams.append('page', params.page.toString())
     if (params.limit) searchParams.append('limit', params.limit.toString())
     if (params.search) searchParams.append('search', params.search)
+    if (params.lessonId) searchParams.append('lessonId', params.lessonId)
 
     const response = await apiService.get<ApiResponse<PaginatedResponse<VideoGroup>>>(`/videos?${searchParams}`)
     return response.data
+  },
+
+  // Get video groups for a specific lesson
+  async getVideoGroupsByLesson(lessonId: string) {
+    const response = await apiService.get<ApiResponse<VideoGroup[] | PaginatedResponse<VideoGroup>>>(`/videos?lessonId=${lessonId}`)
+    // Handle both array and paginated response formats
+    if (Array.isArray(response.data)) {
+      return { items: response.data, total: response.data.length, page: 1, limit: 100, totalPages: 1 }
+    }
+    return response.data as PaginatedResponse<VideoGroup>
   },
 
   // Get specific video group

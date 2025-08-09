@@ -134,7 +134,7 @@ export const lessonController = {
     }
   },
 
-  // Get lesson by ID with full details
+  // Get lesson by ID with full details - UNIFIED PATTERN FOR ALL ROLES
   async getLessonById(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
@@ -145,6 +145,11 @@ export const lessonController = {
       // Multi-tenant filtering
       if (currentUser.tenantId) {
         where.tenantId = currentUser.tenantId;
+      }
+
+      // Role-based filtering for students
+      if (currentUser.role === 'STUDENT') {
+        where.status = 'PUBLISHED'; // Students only see published lessons
       }
 
       const lesson = await prisma.lesson.findFirst({
@@ -159,9 +164,16 @@ export const lessonController = {
               email: true
             }
           },
+          // ALWAYS include videoGroups for ALL roles - unified pattern
           videoGroups: {
+            orderBy: { order: 'asc' },
             include: {
               videos: {
+                orderBy: { order: 'asc' },
+                // Role-based video filtering
+                where: currentUser.role === 'STUDENT' 
+                  ? { status: 'READY' } // Students only see ready videos
+                  : {}, // Teachers and admins see all videos
                 select: {
                   id: true,
                   title: true,
@@ -170,18 +182,27 @@ export const lessonController = {
                   status: true,
                   duration: true,
                   thumbnailPath: true,
-                  filePath: true,
+                  // Only include sensitive fields for teachers/admins
+                  filePath: currentUser.role === 'TEACHER' || currentUser.role === 'ADMIN' ? true : false,
+                  size: true,
+                  mimeType: true,
+                  processingStatus: currentUser.role === 'TEACHER' || currentUser.role === 'ADMIN' ? true : false,
+                  uploadedAt: true,
                   _count: {
                     select: {
                       milestones: true
                     }
                   }
-                },
-                orderBy: { order: 'asc' }
+                }
+              },
+              _count: {
+                select: {
+                  videos: true
+                }
               }
-            },
-            orderBy: { order: 'asc' }
+            }
           },
+          // Include progress for students
           studentProgress: currentUser.role === 'STUDENT' ? {
             where: { studentId: currentUser.id },
             select: {
@@ -196,6 +217,7 @@ export const lessonController = {
           } : false,
           _count: {
             select: {
+              videoGroups: true,
               studentProgress: true
             }
           }
@@ -210,15 +232,7 @@ export const lessonController = {
         return;
       }
 
-      // Access control
-      if (currentUser.role === 'STUDENT' && lesson.status !== 'PUBLISHED') {
-        res.status(403).json({
-          success: false,
-          error: 'Access denied: Lesson not available'
-        });
-        return;
-      }
-
+      // Additional access control for teachers
       if (currentUser.role === 'TEACHER' && 
           lesson.createdById !== currentUser.id && 
           lesson.status !== 'PUBLISHED') {
@@ -229,9 +243,14 @@ export const lessonController = {
         return;
       }
 
+      // Convert BigInt values to strings to avoid serialization issues
+      const processedLesson = JSON.parse(JSON.stringify(lesson, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      ));
+
       res.json({
         success: true,
-        data: lesson
+        data: processedLesson
       });
     } catch (error) {
       logger.error('Error fetching lesson:', error);

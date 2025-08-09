@@ -13,10 +13,13 @@
    - [ ] Need a plan to refactor video preview: at least the state is centralized, but the preview video still has a bunch of problems.
 
 ## Problem 1: AI keeps overwriting working components
-As AI keep overwriting working components, I need to understand which components it is intended to change based on [](./docs/arch/video-player-structure.md). The AI is very GRIT, it will slowly build the entire testing system to fix bugs. However, it needs architectural and coding principles guidance when it is too focused on one specific components and not the whole picture. The human can remember larger relevant context window than AI, so we should support them with out biological larger context window.
+As AI keep overwriting working components, I need to understand which components it is intended to change based on [](./docs/arch).
+* The AI is very GRIT, it will slowly build the entire testing system to fix bugs. However, it needs architectural and coding principles guidance when it is too focused on one specific components and not the whole picture. 
+* The AI is prone to tunnel-vision, requiring human aid in pointing out larger relevant context window
+* The AI is easy to mis-align with original plan and architecture, requiring human to remind them to stick with the plan.
 
 1. Confirm affected components? ask why?
-2. Asking iteratively until a clear picture is provided
-3. Ensure alignment with reported architecture
+2. Asking iteratively until a clear picture is provided (may 2-3 times)
+3. Ensure alignment with reported architecture, need to constantly remind AI of alignment with initial plan
 4. Proceed with the plan
 5. After code change, demand second check to ensure that non-relevant logic is not changed

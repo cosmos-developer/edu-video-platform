@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { videoService } from '../../services/video'
-import { lessonService } from '../../services/lesson'
+import { type LessonWithVideos, type VideoGroup, type Video } from '../../services/lesson'
 import { debug } from '../../utils/debug'
-import type { VideoGroup, Video, Milestone } from '../../services/video'
-import type { Lesson } from '../../services/lesson'
+import type { Milestone } from '../../services/video'
+import { BaseLessonPage } from '../../components/lessons/BaseLessonPage'
+import { VideoList } from '../../components/lessons/VideoList'
 import { useAuth } from '../../hooks/useAuth'
 import { useVideoState } from '../../hooks/useVideoState'
 import { useVideoStateManager } from '../../contexts/VideoStateContext'
@@ -15,9 +16,9 @@ import { AIQuestionGenerator } from '../../components/teacher/AIQuestionGenerato
 
 // Wrapper component to handle VideoGroup creation
 interface VideoUploadFormWrapperProps {
-  lesson: Lesson | null
+  lesson: LessonWithVideos | null
   videoGroups: VideoGroup[]
-  onVideoUploaded: (video: Video) => void
+  onVideoUploaded: () => void
   onClose: () => void
   getOrCreateVideoGroup: () => Promise<string>
 }
@@ -95,12 +96,8 @@ export default function LessonManagementPage() {
   const { user } = useAuth()
   const manager = useVideoStateManager()
   
-  const [lesson, setLesson] = useState<Lesson | null>(null)
-  const [videoGroups, setVideoGroups] = useState<VideoGroup[]>([])
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null)
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   
   // Use unified video state
   const { state: videoState, milestones, metadata } = useVideoState(selectedVideoId || undefined)
@@ -115,7 +112,6 @@ export default function LessonManagementPage() {
       navigate('/dashboard')
       return
     }
-    loadLesson()
   }, [lessonId])
 
   // Check if user has permission
@@ -133,139 +129,135 @@ export default function LessonManagementPage() {
     )
   }
 
-  const loadLesson = async () => {
-    if (!lessonId) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const lessonData = await lessonService.getLesson(lessonId)
-      
-      // Check if user owns this lesson or is admin
-      if (lessonData.createdById !== user?.id && user?.role !== 'ADMIN') {
-        throw new Error('You do not have permission to manage this lesson')
-      }
-
-      setLesson(lessonData)
-      
-      // If lesson has video groups, we can set them (from API response or fetch separately)
-      if ('videoGroups' in lessonData) {
-        setVideoGroups((lessonData as any).videoGroups || [])
-      }
-    } catch (err: any) {
-      debug.error('Error loading lesson:', err)
-      setError(err.message || 'Failed to load lesson')
-    } finally {
-      setLoading(false)
-    }
+  if (!lessonId) {
+    return null
   }
 
-  const handleVideoAdded = () => {
-    // For now, we'll refresh the lesson data to get updated video groups
-    loadLesson()
-    setShowVideoUpload(false)
-  }
-
-  const getOrCreateVideoGroup = async (): Promise<string> => {
-    if (!lesson) throw new Error('No lesson available')
-    
-    // If lesson already has video groups, use the first one
-    if (videoGroups.length > 0) {
-      return videoGroups[0].id
-    }
-    
-    // Create a default video group for this lesson
-    try {
-      const videoGroup = await videoService.createVideoGroup({
-        title: `${lesson.title} - Videos`,
-        description: `Video group for lesson: ${lesson.title}`,
-        lessonId: lesson.id
-      })
-      return videoGroup.id
-    } catch (error) {
-      debug.error('Error creating video group:', error)
-      throw error
-    }
-  }
-
-  const handleMilestoneAdded = async (milestone: Milestone) => {
-    if (selectedVideoId) {
-      // Add milestone through VideoStateManager - will update all subscribers
-      await manager.addMilestone(selectedVideoId, milestone)
-    }
-    setShowMilestoneEditor(false)
-  }
-
-  const handleVideoSelect = async (video: Video) => {
-    try {
-      // Set selected video ID - useVideoState hook will handle loading
-      setSelectedVideoId(video.id)
-      // Load video into state manager
-      await manager.loadVideo(video.id)
-    } catch (error) {
-      debug.error('Error loading video details:', error)
-    }
-  }
-
-  const handleMilestoneSelect = (milestone: Milestone) => {
-    setSelectedMilestone(milestone)
-    setShowQuestionEditor(true)
-  }
-
-  const handleAIQuestionsGenerated = () => {
-    setShowAIGenerator(false)
-    // No need to reload - VideoStateManager will notify all subscribers
-  }
-
-  const handlePreviewLesson = () => {
-    const allVideos = videoGroups.flatMap(group => group.videos || [])
-    if (allVideos.length > 0) {
-      navigate(`/video/${allVideos[0].id}`)
-    }
-  }
-
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return 'Unknown'
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading lesson...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="card text-center py-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Lesson</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={() => navigate('/dashboard')} className="btn-primary">
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!lesson) return null
-
+  // Wrap with BaseLessonPage for unified data loading
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <button
+    <BaseLessonPage lessonId={lessonId} role={user?.role as 'TEACHER' | 'ADMIN'}>
+      {({ lesson, videoGroups, loading, error, onVideoSelect, refreshLesson }) => {
+        // Check ownership inside the render function
+        if (lesson && lesson.createdById !== user?.id && user?.role !== 'ADMIN') {
+          return (
+            <div className="p-6">
+              <div className="card text-center py-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Denied</h3>
+                <p className="text-gray-600 mb-4">You do not have permission to manage this lesson</p>
+                <button onClick={() => navigate('/dashboard')} className="btn-primary">
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+          )
+        }
+
+        const handleVideoAdded = () => {
+          refreshLesson()
+          setShowVideoUpload(false)
+        }
+
+        const getOrCreateVideoGroup = async (): Promise<string> => {
+          if (!lesson) throw new Error('No lesson available')
+          
+          // If lesson already has video groups, use the first one
+          if (videoGroups.length > 0) {
+            return videoGroups[0].id
+          }
+          
+          // Create a default video group for this lesson
+          try {
+            const videoGroup = await videoService.createVideoGroup({
+              title: `${lesson.title} - Videos`,
+              description: `Video group for lesson: ${lesson.title}`,
+              lessonId: lesson.id
+            })
+            return videoGroup.id
+          } catch (error) {
+            debug.error('Error creating video group:', error)
+            throw error
+          }
+        }
+
+        const handleMilestoneAdded = async (milestone: Milestone) => {
+          if (selectedVideoId) {
+            // Add milestone through VideoStateManager - will update all subscribers
+            await manager.addMilestone(selectedVideoId, milestone)
+          }
+          setShowMilestoneEditor(false)
+        }
+
+        const handleVideoSelect = async (video: Video) => {
+          try {
+            // Set selected video ID - useVideoState hook will handle loading
+            setSelectedVideoId(video.id)
+            // Load video into state manager
+            await manager.loadVideo(video.id)
+            // Also update the base component's selection
+            onVideoSelect(video)
+          } catch (error) {
+            debug.error('Error loading video details:', error)
+          }
+        }
+
+        const handleMilestoneSelect = (milestone: Milestone) => {
+          setSelectedMilestone(milestone)
+          setShowQuestionEditor(true)
+        }
+
+        const handleAIQuestionsGenerated = () => {
+          setShowAIGenerator(false)
+          // No need to reload - VideoStateManager will notify all subscribers
+        }
+
+        const handlePreviewLesson = () => {
+          const allVideos = videoGroups.flatMap(group => group.videos || [])
+          if (allVideos.length > 0) {
+            navigate(`/video/${allVideos[0].id}`)
+          }
+        }
+
+        const formatDuration = (seconds: number | null) => {
+          if (!seconds) return 'Unknown'
+          const mins = Math.floor(seconds / 60)
+          const secs = seconds % 60
+          return `${mins}:${secs.toString().padStart(2, '0')}`
+        }
+
+        if (loading) {
+          return (
+            <div className="p-6">
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading lesson...</p>
+                </div>
+              </div>
+            </div>
+          )
+        }
+
+        if (error) {
+          return (
+            <div className="p-6">
+              <div className="card text-center py-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Lesson</h3>
+                <p className="text-gray-600 mb-4">{error}</p>
+                <button onClick={() => navigate('/dashboard')} className="btn-primary">
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+          )
+        }
+
+        if (!lesson) return null
+
+        return (
+          <div className="p-6">
+            {/* Header */}
+            <div className="mb-6">
+              <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center text-blue-600 hover:text-blue-700 transition-colors mb-4"
         >
@@ -309,64 +301,13 @@ export default function LessonManagementPage() {
           <div className="card">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Videos</h2>
             
-            {videoGroups.flatMap(g => g.videos || []).length > 0 ? (
-              <div className="space-y-3">
-                {videoGroups.flatMap(g => g.videos || []).map((video, index) => (
-                  <div
-                    key={video.id}
-                    onClick={() => handleVideoSelect(video)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedVideoId === video.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 w-12 h-8 bg-gray-300 rounded overflow-hidden mr-3">
-                        {video.thumbnailUrl ? (
-                          <img
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 truncate">
-                          {index + 1}. {video.title}
-                        </h4>
-                        <div className="text-sm text-gray-500">
-                          {formatDuration(video.duration)}
-                          {video._count && video._count.milestones > 0 && (
-                            <span className="ml-2">• {video._count.milestones} milestones</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-500 mb-4">No videos added yet</p>
-                <button
-                  onClick={() => setShowVideoUpload(true)}
-                  className="btn-primary"
-                >
-                  Upload First Video
-                </button>
-              </div>
-            )}
+            <VideoList
+              videoGroups={videoGroups}
+              selectedVideoId={selectedVideoId}
+              onVideoSelect={handleVideoSelect}
+              showManageButtons={true}
+              onUploadClick={() => setShowVideoUpload(true)}
+            />
           </div>
         </div>
 
@@ -536,6 +477,9 @@ export default function LessonManagementPage() {
           onClose={() => setShowAIGenerator(false)}
         />
       )}
-    </div>
+          </div>
+        )
+      }}
+    </BaseLessonPage>
   )
 }
