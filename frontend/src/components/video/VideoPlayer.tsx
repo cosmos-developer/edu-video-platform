@@ -26,9 +26,28 @@ export function VideoPlayer({
   onAnswerSubmit,
   onSessionComplete
 }: VideoPlayerProps) {
+  console.log('🎬 VideoPlayer received video prop:', {
+    id: video.id,
+    title: video.title,
+    milestonesCount: video.milestones?.length || 0,
+    milestones: video.milestones?.map(m => ({
+      id: m.id,
+      timestamp: m.timestamp,
+      hasQuestions: m.questions?.length || 0
+    }))
+  });
   const videoRef = useRef<HTMLVideoElement>(null)
   // const manager = useVideoStateManager() // Not currently used
   const { milestones: stateMilestones, metadata } = useVideoState(video.id)
+  console.log('🔍 useVideoState returned:', {
+    stateMilestonesCount: stateMilestones?.length || 0,
+    stateMilestones: stateMilestones?.map(m => ({
+      id: m.id,
+      timestamp: m.timestamp,
+      hasQuestions: m.questions?.length || 0
+    })),
+    metadata
+  });
   const [currentSession, setCurrentSession] = useState<VideoSession | null>(session || null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -37,6 +56,7 @@ export function VideoPlayer({
   const [totalWatchTime, setTotalWatchTime] = useState(0)
   const [currentMilestone, setCurrentMilestone] = useState<Milestone | null>(null)
   const [showQuestionOverlay, setShowQuestionOverlay] = useState(false)
+  const [locallyReachedMilestones, setLocallyReachedMilestones] = useState<string[]>([])
   const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -65,10 +85,12 @@ export function VideoPlayer({
     if (!video) return
 
     const handleLoadedMetadata = () => {
+      console.log('🎬 Video metadata loaded - duration:', video.duration)
       setDuration(video.duration)
       
       // Resume from session position
       if (currentSession?.currentPosition) {
+        console.log('⏭️ Resuming from position:', currentSession.currentPosition)
         video.currentTime = currentSession.currentPosition
         setCurrentTime(currentSession.currentPosition)
       }
@@ -174,40 +196,89 @@ export function VideoPlayer({
   const checkForMilestones = (currentTime: number) => {
     // Use milestones from unified state instead of video prop
     const milestones = stateMilestones || video.milestones || []
-    if (milestones.length === 0 || showQuestionOverlay) return
+    
+    // Only log when near the milestone to reduce noise
+    const nearMilestone = milestones.some(m => Math.abs(currentTime - m.timestamp) <= 3)
+    if (nearMilestone || currentTime < 1) {
+      console.log('🎯 Checking milestones at time:', currentTime.toFixed(3))
+      console.log('📍 Available milestones:', milestones.length, milestones.map(m => ({ id: m.id, timestamp: m.timestamp, type: m.type, hasQuestions: m.questions?.length || 0 })))
+      console.log('🎬 Show overlay?', showQuestionOverlay)
+      console.log('📊 Current session:', currentSession?.id)
+    }
+    
+    if (milestones.length === 0 || showQuestionOverlay) {
+      console.log('🚫 Early return - no milestones or overlay already showing')
+      return
+    }
 
     const reachedMilestones = currentSession?.milestoneProgress?.map(mp => mp.milestoneId) || []
+    const allReachedMilestones = [...reachedMilestones, ...locallyReachedMilestones]
+    if (nearMilestone || currentTime < 1) {
+      console.log('✅ Reached milestones:', reachedMilestones)
+      console.log('🏠 Locally reached milestones:', locallyReachedMilestones)
+      console.log('📊 Session milestone progress:', currentSession?.milestoneProgress)
+    }
     
-    const milestone = milestones.find(m => 
-      Math.abs(currentTime - m.timestamp) <= 1 && // Within 1 second
-      !reachedMilestones.includes(m.id)
-    )
+    const milestone = milestones.find(m => {
+      const timeDiff = Math.abs(currentTime - m.timestamp)
+      const isInRange = timeDiff <= 2
+      const notReached = !allReachedMilestones.includes(m.id)
+      return isInRange && notReached
+    })
 
     if (milestone) {
+      console.log('🎉 MILESTONE TRIGGERED:', milestone.id, 'at', currentTime)
       handleMilestoneReached(milestone)
+    } else if (nearMilestone || currentTime < 1) {
+      console.log('❌ No milestone triggered at', currentTime.toFixed(3))
     }
+    
   }
 
   const handleMilestoneReached = async (milestone: Milestone) => {
-    if (!currentSession) return
+    console.log('🚀 handleMilestoneReached called:', milestone.id)
+    console.log('📋 Milestone details:', { id: milestone.id, timestamp: milestone.timestamp, type: milestone.type, hasQuestions: milestone.questions?.length || 0 })
+    console.log('❓ Milestone questions array:', milestone.questions)
+    console.log('🎮 Current session:', currentSession?.id)
+    
+    if (!currentSession) {
+      console.log('❌ No current session, aborting milestone handling')
+      return
+    }
+
+    // Immediately add to local tracking to prevent re-triggering
+    setLocallyReachedMilestones(prev => 
+      prev.includes(milestone.id) ? prev : [...prev, milestone.id]
+    )
 
     try {
-      // Pause video for quiz milestones
-      if (milestone.type === 'QUIZ' && videoRef.current) {
+      console.log('🎯 Processing milestone with questions:', milestone.questions?.length || 0)
+      
+      // Pause video for milestones with questions
+      if (milestone.questions && milestone.questions.length > 0 && videoRef.current) {
+        console.log('⏸️ PAUSING VIDEO for milestone with questions')
         videoRef.current.pause()
+      } else {
+        console.log('▶️ Not pausing video - no questions or no video ref')
       }
 
       // Mark milestone as reached
+      console.log('📝 Marking milestone as reached...')
       await onMilestoneReached(currentSession.id, milestone.id, milestone.timestamp)
+      console.log('✅ Milestone marked as reached')
       
       setCurrentMilestone(milestone)
+      console.log('🎯 Current milestone set to:', milestone.id)
       
-      // Show question overlay for quiz milestones
-      if (milestone.type === 'QUIZ' && milestone.questions && milestone.questions.length > 0) {
+      // Show question overlay for any milestone with questions
+      if (milestone.questions && milestone.questions.length > 0) {
+        console.log('🔥 SHOWING QUESTION OVERLAY')
         setShowQuestionOverlay(true)
+      } else {
+        console.log('🚫 Not showing overlay - no questions')
       }
     } catch (error) {
-      console.error('Failed to mark milestone:', error)
+      console.error('❌ Failed to mark milestone:', error)
     }
   }
 

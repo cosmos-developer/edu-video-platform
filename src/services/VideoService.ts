@@ -288,7 +288,40 @@ export class VideoService {
 
       const nextOrder = (maxOrder._max.order || 0) + 1
 
-      // Create video with minimal processing for reliability
+      // Process video to extract metadata
+      let duration: number | null = null
+      let size: number | null = null
+      let thumbnailPath: string | null = null
+
+      if (data.filePath) {
+        try {
+          console.log('📹 Processing video metadata for:', data.filePath)
+          
+          // Get full file path for processing
+          const fullVideoPath = getVideoFilePath(data.filePath)
+          console.log('📂 Full video path:', fullVideoPath)
+          
+          // Extract video metadata (duration, dimensions, etc.)
+          const metadata = await VideoProcessingService.getVideoMetadata(fullVideoPath)
+          duration = metadata.duration
+          console.log('📊 Extracted video duration:', duration)
+          
+          // Get file size
+          size = await VideoProcessingService.getFileSize(fullVideoPath)
+          console.log('📏 Extracted video size:', size)
+          
+          // Generate thumbnail (optional - don't fail if this doesn't work)
+          if (data.originalName || data.filename) {
+            thumbnailPath = await VideoProcessingService.generateThumbnail(fullVideoPath, data.originalName || data.filename)
+            console.log('🖼️ Generated thumbnail:', thumbnailPath)
+          }
+        } catch (processingError) {
+          console.warn('⚠️ Video processing failed, creating video without metadata:', processingError)
+          // Continue without metadata rather than failing completely
+        }
+      }
+
+      // Create video with extracted metadata
       const video = await prisma.video.create({
         data: {
           title: data.title,
@@ -298,9 +331,21 @@ export class VideoService {
           filePath: data.filePath,
           fileName: data.originalName || data.filename,
           mimeType: data.mimeType,
+          duration: duration,
+          size: size,
+          thumbnailPath: thumbnailPath,
           uploadedAt: new Date(),
+          processedAt: duration ? new Date() : null, // Mark as processed if we got metadata
+          processingStatus: duration ? 'COMPLETED' : 'FAILED',
           status: 'READY'
         }
+      })
+
+      console.log('✅ Video created successfully with metadata:', {
+        id: video.id,
+        duration: video.duration,
+        size: video.size,
+        processingStatus: video.processingStatus
       })
 
       return video
@@ -320,6 +365,83 @@ export class VideoService {
       
       // Other errors
       throw new Error(`Failed to create video: ${error.message}`)
+    }
+  }
+
+  /**
+   * Process existing video to extract missing metadata
+   */
+  static async processVideoMetadata(videoId: string) {
+    try {
+      const video = await prisma.video.findUnique({
+        where: { id: videoId }
+      })
+
+      if (!video) {
+        throw new Error('Video not found')
+      }
+
+      if (!video.filePath) {
+        throw new Error('Video file path not found')
+      }
+
+      console.log('📹 Processing existing video metadata for:', video.id)
+
+      // Get full file path using the helper function
+      const fullVideoPath = getVideoFilePath(video.filePath)
+      console.log('📂 Full video path:', fullVideoPath)
+
+      // Extract video metadata
+      const metadata = await VideoProcessingService.getVideoMetadata(fullVideoPath)
+      const size = await VideoProcessingService.getFileSize(fullVideoPath)
+      
+      // Generate thumbnail if missing
+      let thumbnailPath = video.thumbnailPath
+      if (!thumbnailPath && video.fileName) {
+        thumbnailPath = await VideoProcessingService.generateThumbnail(fullVideoPath, video.fileName)
+      }
+
+      // Update video with extracted metadata
+      const updatedVideo = await prisma.video.update({
+        where: { id: videoId },
+        data: {
+          duration: metadata.duration,
+          size: size,
+          thumbnailPath: thumbnailPath,
+          processedAt: new Date(),
+          processingStatus: metadata.duration ? 'COMPLETED' : 'FAILED',
+          metadata: {
+            width: metadata.width,
+            height: metadata.height,
+            bitrate: metadata.bitrate,
+            fps: metadata.fps,
+            codec: metadata.codec
+          }
+        }
+      })
+
+      console.log('✅ Video metadata processed successfully:', {
+        id: updatedVideo.id,
+        duration: updatedVideo.duration,
+        size: updatedVideo.size,
+        processingStatus: updatedVideo.processingStatus
+      })
+
+      return updatedVideo
+
+    } catch (error: any) {
+      console.error('Error processing video metadata:', error)
+      
+      // Update processing status to failed
+      await prisma.video.update({
+        where: { id: videoId },
+        data: {
+          processingStatus: 'FAILED',
+          processedAt: new Date()
+        }
+      }).catch(() => {}) // Ignore update errors
+      
+      throw error
     }
   }
 

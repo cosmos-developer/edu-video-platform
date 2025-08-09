@@ -244,16 +244,13 @@ async function main() {
       description: 'A brief introduction to the platform features',
       order: 1,
       status: 'READY',
-      gcsPath: 'demo/welcome-video.mp4',
-      gcsUrl: 'https://storage.googleapis.com/demo-bucket/welcome-video.mp4',
-      duration: 300, // 5 minutes
+      filePath: 'demo/welcome-video.mp4',
+      fileName: 'welcome-video.mp4',
+      duration: 300,
+      size: BigInt(10485760), // 10MB
       mimeType: 'video/mp4',
-      thumbnailUrl: 'https://storage.googleapis.com/demo-bucket/welcome-thumbnail.jpg',
-      metadata: {
-        resolution: '1920x1080',
-        bitrate: 2500,
-        fps: 30
-      },
+      thumbnailPath: 'demo/welcome-thumbnail.jpg',
+      processingStatus: 'COMPLETED',
       uploadedAt: new Date(),
       processedAt: new Date()
     }
@@ -307,32 +304,7 @@ async function main() {
       },
       points: 1,
       passThreshold: 1.0,
-      aiModel: 'gpt-3.5-turbo',
-      aiPrompt: 'Generate a multiple choice question about milestone questions in educational videos',
-      aiConfidence: 0.95
-    }
-  });
-
-  const question2 = await prisma.question.create({
-    data: {
-      milestoneId: milestone2.id,
-      type: 'TRUE_FALSE',
-      status: 'APPROVED',
-      text: 'Students can skip milestone questions if they find them too difficult.',
-      explanation: 'Milestone questions are required and must be answered correctly to proceed.',
-      hints: [
-        'Think about the learning objectives',
-        'Consider what happens when you answer incorrectly'
-      ],
-      difficulty: 'easy',
-      questionData: {
-        correctAnswer: false
-      },
-      points: 1,
-      passThreshold: 1.0,
-      aiModel: 'gpt-3.5-turbo',
-      aiPrompt: 'Generate a true/false question about mandatory milestone questions',
-      aiConfidence: 0.92
+      createdById: teacherUser.id
     }
   });
 
