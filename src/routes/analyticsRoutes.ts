@@ -28,7 +28,7 @@ router.get('/video/:videoId/stats',
 
       const stats = await AnalyticsService.getVideoStats(req.params.videoId, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         data: stats
       })
@@ -80,7 +80,7 @@ router.get('/video/:videoId/progress',
         req.user!
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: progressData
       })
@@ -126,7 +126,7 @@ router.get('/student/:studentId/progress',
         req.user!
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: progressData
       })
@@ -166,7 +166,7 @@ router.get('/lesson/:lessonId/overview',
 
       const overview = await AnalyticsService.getLessonOverview(req.params.lessonId, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         data: overview
       })
@@ -196,7 +196,7 @@ router.get('/dashboard/teacher',
     try {
       const dashboardData = await AnalyticsService.getTeacherDashboard(req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         data: dashboardData
       })
@@ -217,7 +217,7 @@ router.get('/dashboard/student',
     try {
       const dashboardData = await AnalyticsService.getStudentDashboard(req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         data: dashboardData
       })
@@ -248,7 +248,7 @@ router.get('/engagement/heatmap/:videoId',
 
       const heatmapData = await AnalyticsService.getEngagementHeatmap(req.params.videoId, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         data: heatmapData
       })
@@ -287,7 +287,7 @@ router.get('/questions/:milestoneId/performance',
 
       const performance = await AnalyticsService.getQuestionPerformance(req.params.milestoneId, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         data: performance
       })

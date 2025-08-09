@@ -2,7 +2,6 @@ import { PrismaClient } from '@prisma/client'
 import { User } from '../types/auth'
 import { VideoProcessingService } from './VideoProcessingService'
 import { getVideoFilePath, getThumbnailFilePath, deleteVideoFile, deleteThumbnailFile } from '../middleware/upload/videoUploadMiddleware'
-import path from 'path'
 
 const prisma = new PrismaClient()
 
@@ -312,7 +311,7 @@ export class VideoService {
           
           // Generate thumbnail (optional - don't fail if this doesn't work)
           if (data.originalName || data.filename) {
-            thumbnailPath = await VideoProcessingService.generateThumbnail(fullVideoPath, data.originalName || data.filename)
+            thumbnailPath = await VideoProcessingService.generateThumbnail(fullVideoPath, (data.originalName || data.filename)!)
             console.log('🖼️ Generated thumbnail:', thumbnailPath)
           }
         } catch (processingError) {

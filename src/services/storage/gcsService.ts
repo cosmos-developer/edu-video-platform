@@ -2,7 +2,6 @@ import { Storage } from '@google-cloud/storage';
 import { logger } from '../../utils/logger';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import type { Express } from 'express';
 
 export class GCSService {
   private storage: Storage;
@@ -251,7 +250,7 @@ export class GCSService {
 
       files.forEach(file => {
         const metadata = file.metadata;
-        totalSize += parseInt(metadata.size || '0');
+        totalSize += parseInt(String(metadata.size || '0'));
 
         if (file.name.startsWith('lessons/') && file.name.includes('/videos/')) {
           videoCount++;

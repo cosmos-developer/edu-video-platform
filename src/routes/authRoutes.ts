@@ -94,7 +94,7 @@ router.post('/login',
         });
       }
       
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -118,7 +118,7 @@ router.post('/register',
         ip: req.ip
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: {
           user: result.user,
@@ -139,7 +139,7 @@ router.post('/register',
         });
       }
       
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -157,7 +157,7 @@ router.post('/refresh',
       
       const result = await authService.refreshToken(refreshToken);
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           tokens: {
@@ -177,7 +177,7 @@ router.post('/refresh',
         });
       }
       
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -199,13 +199,13 @@ router.post('/logout',
         ip: req.ip
       });
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Logout successful'
       });
     } catch (error) {
       logger.error('Logout error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -220,7 +220,7 @@ router.get('/me',
     try {
       const user = req.user!;
       
-      res.json({
+      return res.json({
         success: true,
         data: {
           id: user.id,
@@ -239,7 +239,7 @@ router.get('/me',
       });
     } catch (error) {
       logger.error('Get profile error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Internal server error'
       });

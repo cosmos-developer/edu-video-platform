@@ -77,7 +77,7 @@ export class VideoProcessingService {
 
     // Fallback: try to get basic file stats
     try {
-      const stats = await fs.stat(videoPath)
+      await fs.stat(videoPath)
       return {
         ...defaultMetadata,
         duration: null // Cannot determine without ffprobe

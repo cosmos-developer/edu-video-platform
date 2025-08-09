@@ -43,7 +43,7 @@ router.post('/',
 
       const milestone = await MilestoneService.createMilestone(milestoneData, req.user!)
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: milestone,
         message: 'Milestone created successfully'
@@ -97,7 +97,7 @@ router.get('/video/:videoId',
 
       const milestones = await MilestoneService.getMilestonesByVideo(req.params.videoId, req.user!.id)
 
-      res.json({
+      return res.json({
         success: true,
         data: milestones
       })
@@ -153,7 +153,7 @@ router.put('/:id',
         req.user!
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: milestone,
         message: 'Milestone updated successfully'
@@ -207,7 +207,7 @@ router.delete('/:id',
 
       await MilestoneService.deleteMilestone(req.params.id, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Milestone deleted successfully'
       })
@@ -270,7 +270,7 @@ router.post('/:id/questions',
 
       const question = await MilestoneService.addQuestionToMilestone(questionData, req.user!)
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: question,
         message: 'Question added successfully'

@@ -47,7 +47,7 @@ router.post('/',
 
       const question = await QuestionService.createQuestion(questionData, req.user!)
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: question,
         message: 'Question created successfully'
@@ -101,7 +101,7 @@ router.get('/milestone/:milestoneId',
 
       const questions = await QuestionService.getQuestionsByMilestone(req.params.milestoneId, req.user!.id)
 
-      res.json({
+      return res.json({
         success: true,
         data: questions
       })
@@ -147,7 +147,7 @@ router.get('/:id',
         })
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: question
       })
@@ -200,7 +200,7 @@ router.put('/:id',
         req.user!
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: question,
         message: 'Question updated successfully'
@@ -254,7 +254,7 @@ router.delete('/:id',
 
       await QuestionService.deleteQuestion(req.params.id, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Question deleted successfully'
       })
@@ -305,7 +305,7 @@ router.post('/:id/approve',
         req.body.reviewNotes
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: question,
         message: 'Question approved successfully'
@@ -342,7 +342,7 @@ router.get('/templates',
     try {
       const templates = QuestionService.getQuestionTemplates()
 
-      res.json({
+      return res.json({
         success: true,
         data: templates,
         message: 'Question templates retrieved successfully'

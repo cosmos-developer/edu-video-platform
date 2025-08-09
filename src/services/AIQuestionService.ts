@@ -234,7 +234,8 @@ Important: Return only valid JSON. No additional text or markdown formatting.
   // Generate questions for existing milestone
   static async generateQuestionsForMilestone(
     milestoneId: string,
-    request: Omit<GenerateQuestionsRequest, 'content'> & { content?: string }
+    request: Omit<GenerateQuestionsRequest, 'content'> & { content?: string },
+    userId: string
   ): Promise<void> {
     // Get milestone details
     const milestone = await prisma.milestone.findUnique({
@@ -280,7 +281,8 @@ Important: Return only valid JSON. No additional text or markdown formatting.
             correctAnswer: questionData.correctAnswer,
             options: questionData.options || []
           },
-          explanation: questionData.explanation || null
+          explanation: questionData.explanation || null,
+          createdById: userId
         }
       })
 
@@ -303,7 +305,8 @@ Important: Return only valid JSON. No additional text or markdown formatting.
   // Generate milestone and questions from content
   static async generateMilestoneWithQuestions(
     videoId: string,
-    request: GenerateQuestionsRequest
+    request: GenerateQuestionsRequest,
+    userId: string
   ): Promise<{ milestoneId: string; questionCount: number }> {
     const generatedContent = await this.generateQuestions(request)
 
@@ -333,7 +336,8 @@ Important: Return only valid JSON. No additional text or markdown formatting.
             correctAnswer: questionData.correctAnswer,
             options: questionData.options || []
           },
-          explanation: questionData.explanation || null
+          explanation: questionData.explanation || null,
+          createdById: userId
         }
       })
 

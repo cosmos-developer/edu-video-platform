@@ -106,7 +106,7 @@ router.get('/',
         userId: req.user!.id
       })
 
-      res.json({
+      return res.json({
         success: true,
         data: result.videoGroups,
         meta: {
@@ -119,7 +119,7 @@ router.get('/',
 
     } catch (error) {
       console.error('Error fetching video groups:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch video groups'
       })
@@ -150,14 +150,14 @@ router.get('/groups/:id',
         })
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: videoGroup
       })
 
     } catch (error) {
       console.error('Error fetching video group:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch video group'
       })
@@ -192,7 +192,7 @@ router.post('/groups',
 
       const videoGroup = await VideoService.createVideoGroup(videoGroupData, req.body.lessonId)
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: videoGroup,
         message: 'Video group created successfully'
@@ -200,7 +200,7 @@ router.post('/groups',
 
     } catch (error) {
       console.error('Error creating video group:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create video group'
       })
@@ -239,7 +239,7 @@ router.put('/groups/:id',
         req.user!
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: videoGroup,
         message: 'Video group updated successfully'
@@ -262,7 +262,7 @@ router.put('/groups/:id',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update video group'
       })
@@ -309,7 +309,7 @@ router.post('/groups/:groupId/videos',
 
       const video = await VideoService.createVideo(videoData, req.user!)
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: video,
         message: 'Video added successfully'
@@ -332,7 +332,7 @@ router.post('/groups/:groupId/videos',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create video'
       })
@@ -373,14 +373,14 @@ router.get('/:id',
         })) : []
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: serializedVideo
       })
 
     } catch (error) {
       console.error('Error fetching video:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to fetch video'
       })
@@ -415,7 +415,7 @@ router.put('/:id',
         req.user!
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: video,
         message: 'Video updated successfully'
@@ -438,7 +438,7 @@ router.put('/:id',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update video'
       })
@@ -462,7 +462,7 @@ router.post('/:id/process',
 
       const video = await VideoService.processVideoMetadata(req.params.id)
 
-      res.json({
+      return res.json({
         success: true,
         data: video,
         message: 'Video metadata processed successfully'
@@ -478,7 +478,7 @@ router.post('/:id/process',
         })
       }
       
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to process video metadata'
       })
@@ -502,7 +502,7 @@ router.delete('/:id',
 
       await VideoService.deleteVideo(req.params.id, req.user!)
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Video deleted successfully'
       })
@@ -524,7 +524,7 @@ router.delete('/:id',
         })
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to delete video'
       })
@@ -595,7 +595,7 @@ router.get('/:id/stream',
         }
 
         res.writeHead(206, head)
-        file.pipe(res)
+        return file.pipe(res)
       } else {
         // Send entire file
         const head = {
@@ -604,12 +604,12 @@ router.get('/:id/stream',
         }
 
         res.writeHead(200, head)
-        fs.createReadStream(videoPath).pipe(res)
+        return fs.createReadStream(videoPath).pipe(res)
       }
 
     } catch (error) {
       console.error('Error streaming video:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to stream video'
       })
@@ -649,11 +649,11 @@ router.get('/:id/thumbnail',
       }
 
       // Send thumbnail file
-      res.sendFile(path.resolve(thumbnailPath))
+      return res.sendFile(path.resolve(thumbnailPath))
 
     } catch (error) {
       console.error('Error serving thumbnail:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to serve thumbnail'
       })

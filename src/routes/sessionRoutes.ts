@@ -39,7 +39,7 @@ router.post('/start',
         } : undefined
       } : null
 
-      res.json({
+      return res.json({
         success: true,
         data: serializedSession,
         message: 'Video session started'
@@ -99,7 +99,7 @@ router.put('/:sessionId/progress',
         } : undefined
       } : null
 
-      res.json({
+      return res.json({
         success: true,
         data: serializedSession,
         message: 'Progress updated'
@@ -153,7 +153,7 @@ router.post('/:sessionId/milestone',
         req.user!.id
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: result,
         message: 'Milestone marked as reached'
@@ -220,7 +220,7 @@ router.post('/:sessionId/question',
         req.user!.id
       )
 
-      res.json({
+      return res.json({
         success: true,
         data: result,
         message: 'Answer submitted successfully'
@@ -294,7 +294,7 @@ router.put('/:sessionId/complete',
         } : undefined
       } : null
 
-      res.json({
+      return res.json({
         success: true,
         data: serializedSession,
         message: 'Session completed successfully'
@@ -354,7 +354,7 @@ router.get('/video/:videoId',
         } : undefined
       } : null
       
-      res.json({
+      return res.json({
         success: true,
         data: serializedSession
       })
@@ -404,7 +404,7 @@ router.get('/user',
         status
       })
 
-      res.json({
+      return res.json({
         success: true,
         data: result.sessions,
         meta: {

@@ -110,7 +110,7 @@ export class AnalyticsService {
           user.role === 'ADMIN' ? {} : {
             videoGroup: {
               OR: [
-                { lesson: { isPublic: true } },
+                { lesson: { status: 'PUBLISHED' } },
                 {
                   videos: {
                     some: {

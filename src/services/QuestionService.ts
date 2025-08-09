@@ -26,27 +26,6 @@ interface UpdateQuestionData {
   status?: QuestionStatus
 }
 
-interface QuestionDataTemplates {
-  MULTIPLE_CHOICE: {
-    options: string[]
-    correctAnswerIndex: number
-  }
-  TRUE_FALSE: {
-    correctAnswer: boolean
-  }
-  SHORT_ANSWER: {
-    correctAnswers: string[] // Multiple acceptable answers
-    caseSensitive?: boolean
-  }
-  FILL_IN_BLANK: {
-    template: string // Text with blanks marked as {{blank}}
-    blanks: Array<{
-      acceptedAnswers: string[]
-      caseSensitive?: boolean
-    }>
-  }
-}
-
 export class QuestionService {
   /**
    * Create a new question for a milestone

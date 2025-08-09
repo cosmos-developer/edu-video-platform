@@ -15,7 +15,7 @@ class JWTService {
       ...(user.tenantId && { tenantId: user.tenantId })
     };
 
-    return jwt.sign(payload, environment.jwt.secret, {
+    return jwt.sign(payload, environment.jwt.secret as string, {
       expiresIn: environment.jwt.expiresIn,
       issuer: 'education-platform',
       audience: 'education-platform-users',
@@ -33,7 +33,7 @@ class JWTService {
       ...(user.tenantId && { tenantId: user.tenantId })
     };
 
-    return jwt.sign(payload, environment.jwt.refreshSecret, {
+    return jwt.sign(payload, environment.jwt.refreshSecret as string, {
       expiresIn: environment.jwt.refreshExpiresIn,
       issuer: 'education-platform',
       audience: 'education-platform-refresh',
@@ -55,7 +55,7 @@ class JWTService {
    */
   verifyAccessToken(token: string): JWTPayload {
     try {
-      const payload = jwt.verify(token, environment.jwt.secret, {
+      const payload = jwt.verify(token, environment.jwt.secret as string, {
         issuer: 'education-platform',
         audience: 'education-platform-users',
       }) as JWTPayload;
@@ -78,7 +78,7 @@ class JWTService {
    */
   verifyRefreshToken(token: string): JWTPayload {
     try {
-      const payload = jwt.verify(token, environment.jwt.refreshSecret, {
+      const payload = jwt.verify(token, environment.jwt.refreshSecret as string, {
         issuer: 'education-platform',
         audience: 'education-platform-refresh',
       }) as JWTPayload;

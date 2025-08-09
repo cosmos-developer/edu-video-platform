@@ -18,7 +18,7 @@ router.get('/providers',
   (_req: AuthenticatedRequest, res) => {
     try {
       const providers = AIQuestionService.getAvailableProviders()
-      res.json({
+      return res.json({
         success: true,
         data: {
           providers,
@@ -27,7 +27,7 @@ router.get('/providers',
       })
     } catch (error) {
       console.error('Error getting AI providers:', error)
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to get AI providers'
       })
@@ -65,7 +65,7 @@ router.post('/generate-questions',
         provider: req.body.provider
       })
 
-      res.json({
+      return res.json({
         success: true,
         data: result,
         message: 'Questions generated successfully'
@@ -127,9 +127,9 @@ router.post('/generate-for-milestone/:milestoneId',
         questionTypes: req.body.questionTypes || ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER'],
         difficulty: req.body.difficulty || 'MEDIUM',
         provider: req.body.provider
-      })
+      }, req.user!.id)
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Questions generated and added to milestone successfully'
       })
@@ -189,9 +189,9 @@ router.post('/generate-milestone-with-questions/:videoId',
         questionTypes: req.body.questionTypes || ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'SHORT_ANSWER'],
         difficulty: req.body.difficulty || 'MEDIUM',
         provider: req.body.provider
-      })
+      }, req.user!.id)
 
-      res.json({
+      return res.json({
         success: true,
         data: result,
         message: 'Milestone and questions generated successfully'
