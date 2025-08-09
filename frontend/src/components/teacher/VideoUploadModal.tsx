@@ -3,12 +3,12 @@ import { videoService } from '../../services/video'
 import type { Video } from '../../services/video'
 
 interface VideoUploadModalProps {
-  lessonId: string
+  groupId: string
   onVideoAdded: (video: Video) => void
   onClose: () => void
 }
 
-export function VideoUploadModal({ lessonId, onVideoAdded, onClose }: VideoUploadModalProps) {
+export function VideoUploadModal({ groupId, onVideoAdded, onClose }: VideoUploadModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -40,7 +40,7 @@ export function VideoUploadModal({ lessonId, onVideoAdded, onClose }: VideoUploa
     setError(null)
 
     try {
-      const response = await videoService.addVideoToGroup(lessonId, {
+      const response = await videoService.addVideoToGroup(groupId, {
         title: formData.title,
         description: formData.description || undefined,
         videoUrl: formData.videoUrl,
@@ -49,9 +49,10 @@ export function VideoUploadModal({ lessonId, onVideoAdded, onClose }: VideoUploa
       })
 
       onVideoAdded(response)
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error adding video:', err)
-      setError(err.message || 'Failed to add video')
+      const message = err instanceof Error ? err.message : 'Failed to add video'
+      setError(message)
     } finally {
       setLoading(false)
     }

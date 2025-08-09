@@ -94,9 +94,10 @@ export function AIQuestionGenerator({
       const result = await aiService.generateQuestions(formData)
       setGeneratedQuestions(result.questions)
       setShowPreview(true)
-    } catch (err: any) {
+    } catch (err) {
       debug.error('Error generating questions:', err)
-      setError(err.message || 'Failed to generate questions')
+      const message = err instanceof Error ? err.message : 'Failed to generate questions'
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -124,9 +125,10 @@ export function AIQuestionGenerator({
       }
 
       onQuestionsGenerated()
-    } catch (err: any) {
+    } catch (err) {
       debug.error('Error applying questions:', err)
-      setError(err.message || 'Failed to apply questions')
+      const message = err instanceof Error ? err.message : 'Failed to apply questions'
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -276,8 +278,8 @@ export function AIQuestionGenerator({
                       <label key={key} className="flex items-center">
                         <input
                           type="checkbox"
-                          checked={formData.questionTypes?.includes(key as any) || false}
-                          onChange={() => handleQuestionTypesChange(key as any)}
+                          checked={formData.questionTypes?.includes(key as QuestionFormData['questionTypes'][number]) || false}
+                          onChange={() => handleQuestionTypesChange(key as QuestionFormData['questionTypes'][number])}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                         <span className="ml-2 text-sm text-gray-700">{label}</span>

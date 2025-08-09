@@ -40,8 +40,8 @@ export function ProtectedRoute({
     // Redirect based on user's actual role
     const roleRedirects = {
       STUDENT: '/dashboard',
-      TEACHER: '/teacher/dashboard',
-      ADMIN: '/admin/dashboard'
+      TEACHER: '/dashboard',
+      ADMIN: '/dashboard'
     }
     
     const userRedirect = roleRedirects[user?.role as keyof typeof roleRedirects] || '/dashboard'
@@ -80,8 +80,8 @@ export function PublicRoute({
   if (isAuthenticated && user) {
     const roleRedirects = {
       STUDENT: '/dashboard',
-      TEACHER: '/teacher/dashboard',
-      ADMIN: '/admin/dashboard'
+      TEACHER: '/dashboard',
+      ADMIN: '/dashboard'
     }
     
     const redirect = roleRedirects[user.role as keyof typeof roleRedirects] || redirectTo

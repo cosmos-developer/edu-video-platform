@@ -82,7 +82,7 @@ export class ProgressCalculator {
 
     // Fall back to session data
     const questionAttempts = session?.questionAttempts || []
-    const correct = questionAttempts.filter((qa: any) => qa.isCorrect).length
+    const correct = questionAttempts.filter((qa) => qa.isCorrect).length
     const total = questionAttempts.length
 
     return { correct, total }

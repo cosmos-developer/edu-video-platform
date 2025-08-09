@@ -106,14 +106,15 @@ export function VideoUploadForm({ groupId, onVideoUploaded, onClose }: VideoUplo
 
       setUploadState(prev => ({ ...prev, processing: true, progress: 100 }))
       onVideoUploaded(video)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Upload failed:', error)
+      const message = error instanceof Error ? error.message : 'Failed to upload video'
       setUploadState(prev => ({
         ...prev,
         uploading: false,
         processing: false,
         progress: 0,
-        error: error.message || 'Failed to upload video'
+        error: message
       }))
     }
   }

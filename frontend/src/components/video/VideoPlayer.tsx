@@ -133,6 +133,7 @@ export function VideoPlayer({
       video.removeEventListener('ended', handleEnded)
       video.removeEventListener('volumechange', handleVolumeChange)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSession])
 
   const startProgressTracking = () => {

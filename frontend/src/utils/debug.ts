@@ -16,7 +16,7 @@ export const debug = {
   /**
    * Log debug information (only in debug mode)
    */
-  log: (...args: any[]) => {
+  log: (...args: unknown[]) => {
     if (isDebugEnabled()) {
       console.log('[DEBUG]', ...args)
     }
@@ -25,7 +25,7 @@ export const debug = {
   /**
    * Log informational messages (only in development)
    */
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (isDevelopment) {
       console.info('[INFO]', ...args)
     }
@@ -34,7 +34,7 @@ export const debug = {
   /**
    * Log warnings (always in development, never in production)
    */
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     if (isDevelopment) {
       console.warn('[WARN]', ...args)
     }
@@ -43,7 +43,7 @@ export const debug = {
   /**
    * Log errors (always logged)
    */
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.error('[ERROR]', ...args)
   },
 
@@ -62,7 +62,7 @@ export const debug = {
   /**
    * Log auth events (only in debug mode)
    */
-  auth: (event: string, data?: any) => {
+  auth: (event: string, data?: unknown) => {
     if (isDebugEnabled()) {
       console.log(`[AUTH] ${event}`, data || '')
     }
@@ -71,7 +71,7 @@ export const debug = {
   /**
    * Log video player events (only in debug mode)
    */
-  video: (event: string, data?: any) => {
+  video: (event: string, data?: unknown) => {
     if (isDebugEnabled()) {
       console.log(`[VIDEO] ${event}`, data || '')
     }
@@ -105,5 +105,5 @@ export const debug = {
 
 // Make debug tools available globally in development
 if (isDevelopment && typeof window !== 'undefined') {
-  (window as any).debug = debug
+  (window as typeof globalThis & { debug: typeof debug }).debug = debug
 }

@@ -282,13 +282,28 @@ router.put('/groups/:id',
   }
 )
 
-// POST /api/videos/groups/:groupId/videos - Upload video to group (creator or admin only)
+// POST /api/videos/groups/:groupId/videos - Upload video to group or add video URL
 router.post('/groups/:groupId/videos',
-  uploadVideoMiddleware, // Handle file upload first
-  handleUploadErrors, // Handle upload errors
+  // Conditionally apply upload middleware only for multipart requests
+  (req, res, next) => {
+    if (req.headers['content-type']?.startsWith('multipart/form-data')) {
+      uploadVideoMiddleware(req, res, (err) => {
+        if (err) {
+          return handleUploadErrors(err, req, res, next)
+        }
+        next()
+      })
+    } else {
+      next()
+    }
+  },
   validateCUIDParam('groupId', 'Invalid group ID'),
   body('title').notEmpty().trim().withMessage('Title is required'),
   body('description').optional().trim(),
+  // Conditional validation based on content type
+  body('videoUrl').optional().isURL().withMessage('Video URL must be valid'),
+  body('duration').optional().isInt({ min: 1 }).withMessage('Duration must be positive'),
+  body('thumbnailUrl').optional().isURL().withMessage('Thumbnail URL must be valid'),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const errors = validationResult(req)
@@ -300,30 +315,62 @@ router.post('/groups/:groupId/videos',
         })
       }
 
-      // Check if file was uploaded
-      if (!req.file) {
+      const isFileUpload = req.file !== undefined
+      const isUrlVideo = req.body.videoUrl !== undefined
+
+      // Check if we have either a file or URL
+      if (!isFileUpload && !isUrlVideo) {
+        // Provide helpful debugging info
+        const debugInfo = {
+          hasFile: !!req.file,
+          hasVideoUrl: !!req.body.videoUrl,
+          bodyKeys: Object.keys(req.body),
+          contentType: req.headers['content-type']
+        }
+        
         return res.status(400).json({
           success: false,
-          error: 'Video file is required'
+          error: 'Either video file or video URL is required',
+          debug: debugInfo
         })
       }
 
-      const videoData = {
+      let videoData: any = {
         title: req.body.title,
         description: req.body.description || null,
         videoGroupId: req.params.groupId,
         uploadedBy: req.user!.id,
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        filePath: req.file.filename, // Store just the filename
-        mimeType: req.file.mimetype
+      }
+
+      if (isFileUpload) {
+        // File upload case
+        videoData = {
+          ...videoData,
+          filename: req.file!.filename,
+          originalName: req.file!.originalname,
+          filePath: req.file!.filename, // Store just the filename
+          mimeType: req.file!.mimetype
+        }
+      } else if (isUrlVideo) {
+        // URL-based video case
+        videoData = {
+          ...videoData,
+          videoUrl: req.body.videoUrl,
+          duration: req.body.duration || null,
+          thumbnailUrl: req.body.thumbnailUrl || null
+        }
       }
 
       const video = await VideoService.createVideo(videoData, req.user!)
 
+      // Convert BigInt values to strings to avoid serialization issues
+      const processedVideo = JSON.parse(JSON.stringify(video, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      ))
+
       return res.status(201).json({
         success: true,
-        data: video,
+        data: processedVideo,
         message: 'Video added successfully'
       })
 

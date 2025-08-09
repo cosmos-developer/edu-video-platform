@@ -82,10 +82,10 @@ describe('VideoPlayer', () => {
     const pauseButton = screen.getByTestId('pause-button');
     
     await user.click(playButton);
-    expect(playButton).toHaveBeenClicked;
+    expect(playButton).toHaveBeenCalledTimes(1);
     
     await user.click(pauseButton);
-    expect(pauseButton).toHaveBeenClicked;
+    expect(pauseButton).toHaveBeenCalledTimes(1);
   });
 
   it('triggers milestone reached callback', async () => {

@@ -133,9 +133,10 @@ export function MilestoneEditor({ video, milestone, onMilestoneAdded, onClose }:
       }
 
       onMilestoneAdded(response)
-    } catch (err: any) {
+    } catch (err) {
       console.error(`Error ${isEditing ? 'updating' : 'creating'} milestone:`, err)
-      setError(err.message || `Failed to ${isEditing ? 'update' : 'create'} milestone`)
+      const message = err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} milestone`
+      setError(message)
     } finally {
       setLoading(false)
     }

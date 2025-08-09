@@ -53,6 +53,11 @@ class ApiService {
           config.headers.Authorization = `Bearer ${token}`
         }
         
+        // Handle FormData - don't set Content-Type, let axios handle it
+        if (config.data instanceof FormData) {
+          delete config.headers['Content-Type']
+        }
+        
         // Add request timestamp for debugging
         (config as any).metadata = { startTime: new Date() }
         
@@ -204,6 +209,22 @@ class ApiService {
    * POST request
    */
   async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    // Debug: Log video upload attempts
+    if (url.includes('/videos/groups/') && url.includes('/videos')) {
+      console.warn('[ApiService] Video upload POST request:', {
+        url,
+        data,
+        isFormData: data instanceof FormData,
+        dataKeys: data instanceof FormData ? 
+          Array.from((data as FormData).keys()) : 
+          (data ? Object.keys(data) : []),
+        hasVideo: data && 'video' in data,
+        hasVideoUrl: data && 'videoUrl' in data,
+        contentType: config?.headers?.['Content-Type'],
+        stack: new Error().stack?.split('\n').slice(2, 7).join('\n')
+      })
+    }
+    
     return this.request<T>({ ...config, method: 'POST', url, data })
   }
 

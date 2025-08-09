@@ -248,8 +248,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'LOGIN_ERROR', payload: response.error || 'Login failed' })
         throw new Error(response.error || 'Login failed')
       }
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Login failed'
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Login failed'
       dispatch({ type: 'LOGIN_ERROR', payload: message })
       throw error
     }
@@ -267,8 +267,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'LOGIN_ERROR', payload: response.error || 'Registration failed' })
         throw new Error(response.error || 'Registration failed')
       }
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Registration failed'
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Registration failed'
       dispatch({ type: 'LOGIN_ERROR', payload: message })
       throw error
     }
@@ -324,6 +324,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 // Hook to use auth context
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (context === undefined) {
@@ -333,6 +334,7 @@ export function useAuth(): AuthContextType {
 }
 
 // Hook for checking specific roles
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRole(requiredRole: string): boolean {
   const { state: { user } } = useAuth()
   return user?.role === requiredRole

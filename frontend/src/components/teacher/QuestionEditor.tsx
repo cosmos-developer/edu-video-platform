@@ -124,9 +124,10 @@ export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated
       if (onQuestionsUpdated) {
         onQuestionsUpdated()
       }
-    } catch (err: any) {
+    } catch (err) {
       debug.error('Error adding question:', err)
-      setError(err.message || 'Failed to add question')
+      const message = err instanceof Error ? err.message : 'Failed to add question'
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -209,7 +210,7 @@ export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {questions.map((question: any, index: number) => (
+                  {questions.map((question, index) => (
                     <div key={question.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center space-x-2">

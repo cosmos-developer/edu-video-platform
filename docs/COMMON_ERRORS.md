@@ -169,7 +169,83 @@ export const controllerMethod = {
 
 ## Frontend Integration Issues
 
-### 6. CORS and Request Headers
+### 6. Video Upload File/URL Mismatch
+
+**Error Message:** "Video file is required"
+
+**Symptoms:**
+- Video upload fails with 400 Bad Request
+- Request shows `"data": "{\"video\":{},\"title\":\"test\"}"`
+- Content-Type is `application/json` instead of `multipart/form-data`
+- Debug info shows `bodyKeys: ["video", "title"]` instead of `["videoUrl", "title"]`
+
+**Root Cause:** Frontend sending wrong field names or using deprecated component:
+
+1. **File Upload**: Requires `FormData` with actual file and `multipart/form-data`
+2. **URL-based Video**: Requires JSON with `videoUrl` field and `application/json`
+
+**Problematic Pattern:**
+```typescript
+// WRONG: Sending empty video object to file upload endpoint
+await videoService.post('/videos/groups/123/videos', {
+  video: {}, // ← Empty object instead of File or URL
+  title: 'test'
+})
+```
+
+**Solution - Use correct upload method:**
+
+```typescript
+// For FILE uploads - use uploadVideoFile()
+await videoService.uploadVideoFile(groupId, file, {
+  title: 'Video Title',
+  description: 'Optional description'
+})
+
+// For URL-based videos - use addVideoToGroup()
+await videoService.addVideoToGroup(groupId, {
+  title: 'Video Title', 
+  videoUrl: 'https://example.com/video.mp4',
+  description: 'Optional description',
+  duration: 300, // optional
+  thumbnailUrl: 'https://example.com/thumb.jpg' // optional
+})
+```
+
+**Backend Fix Applied:** Updated endpoint to handle both multipart file uploads and JSON URL requests conditionally.
+
+### 7. Authentication Routing Issues
+
+**Problem:** Teachers redirected to `/teacher/dashboard` instead of `/dashboard` after login
+
+**Symptoms:**
+- Users see empty page after successful login
+- URL shows `/teacher/dashboard` which doesn't exist in routing
+- Browser console shows navigation errors
+
+**Root Cause:** Incorrect role-based redirects in `ProtectedRoute.tsx`:
+```typescript
+// PROBLEMATIC: Non-existent route
+const roleRedirects = {
+  STUDENT: '/dashboard',
+  TEACHER: '/teacher/dashboard', // ← This route doesn't exist
+  ADMIN: '/admin/dashboard'      // ← This route doesn't exist
+}
+```
+
+**Solution:** All roles should redirect to the unified `/dashboard` route:
+```typescript
+// CORRECT: All roles use the same dashboard
+const roleRedirects = {
+  STUDENT: '/dashboard',
+  TEACHER: '/dashboard',
+  ADMIN: '/dashboard'
+}
+```
+
+**Location:** `frontend/src/components/auth/ProtectedRoute.tsx` (lines 41-45 and 81-85)
+
+### 7. CORS and Request Headers
 
 **Error:** CORS policy blocks requests
 
@@ -295,6 +371,105 @@ npx prisma migrate reset --force
 # Check environment variables
 printenv | grep -E "(DATABASE_URL|JWT_SECRET)"
 ```
+
+## Frontend Code Quality Issues
+
+### 12. ESLint Common Violations
+
+**Most Frequent Issues Found (130+ errors):**
+
+1. **TypeScript `any` Type Usage (60+ occurrences)**
+   - Files affected: Most service files, context files, utility files
+   - Pattern: `@typescript-eslint/no-explicit-any`
+   
+   **Fix:** Replace `any` with proper types:
+   ```typescript
+   // BAD
+   } catch (error: any) {
+   
+   // GOOD
+   } catch (error: unknown) {
+     const message = error instanceof Error ? error.message : 'Unknown error'
+   ```
+
+2. **React Refresh Export Issues (40+ occurrences)**
+   - Files affected: Context files, utility files
+   - Pattern: `react-refresh/only-export-components`
+   
+   **Fix:** Move non-component exports to separate files:
+   ```typescript
+   // BAD - mixing exports in component file
+   export const useAuth = () => {...}
+   export const AuthProvider = () => {...}
+   
+   // GOOD - separate files
+   // hooks/useAuth.ts
+   export const useAuth = () => {...}
+   // components/AuthProvider.tsx
+   export const AuthProvider = () => {...}
+   ```
+
+3. **Unused Variables (Multiple occurrences)**
+   - Pattern: `@typescript-eslint/no-unused-vars`
+   - Common in: Event handlers, destructured objects
+   
+   **Fix:** Prefix with underscore or remove:
+   ```typescript
+   // BAD
+   const { data, error } = response // error unused
+   
+   // GOOD
+   const { data, _error } = response
+   // OR
+   const { data } = response
+   ```
+
+4. **Case Block Declarations**
+   - Pattern: `no-case-declarations`
+   - Files: QuestionOverlay.tsx
+   
+   **Fix:** Wrap case blocks in braces:
+   ```typescript
+   // BAD
+   switch(type) {
+     case 'MULTIPLE_CHOICE':
+       const options = data.options
+       break
+   }
+   
+   // GOOD
+   switch(type) {
+     case 'MULTIPLE_CHOICE': {
+       const options = data.options
+       break
+     }
+   }
+   ```
+
+5. **Missing useEffect Dependencies**
+   - Pattern: `react-hooks/exhaustive-deps`
+   - Files: VideoPlayer.tsx, BaseLessonPage.tsx
+   
+   **Fix:** Include all dependencies or use useCallback:
+   ```typescript
+   // Use useCallback for stable function references
+   const loadData = useCallback(() => {
+     // function body
+   }, [dependencies])
+   
+   useEffect(() => {
+     loadData()
+   }, [loadData])
+   ```
+
+### 13. Dead Code and Unused Files
+
+**Files to Review for Removal:**
+- `frontend/src/contexts/AuthContext.old.tsx` - Old authentication context
+- `frontend/src/services/api.old.ts` - Old API service
+- `frontend/src/services/auth.old.ts` - Old auth service
+
+**Recommendation:** Archive or remove `.old` files after confirming they're not needed.
 
 ---
 

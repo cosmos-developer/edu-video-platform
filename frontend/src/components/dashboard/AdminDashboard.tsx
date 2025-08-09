@@ -32,7 +32,7 @@ interface AdminStats {
   }>
 }
 
-export function AdminDashboard({ user: _user }: AdminDashboardProps) {
+export function AdminDashboard({ user }: AdminDashboardProps) {
   const navigate = useNavigate()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)

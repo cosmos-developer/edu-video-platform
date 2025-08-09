@@ -15,7 +15,7 @@ export function QuestionOverlay({
 }: QuestionOverlayProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState('')
-  const [_selectedAnswerText, setSelectedAnswerText] = useState('') // For display purposes
+  const [selectedAnswerText, setSelectedAnswerText] = useState('') // For display purposes
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{
     isCorrect: boolean
@@ -76,7 +76,7 @@ export function QuestionOverlay({
 
   const renderQuestionContent = () => {
     switch (currentQuestion.type) {
-      case 'MULTIPLE_CHOICE':
+      case 'MULTIPLE_CHOICE': {
         // Questions from backend have questionData with options array
         const options = currentQuestion.questionData?.options || []
         const correctIndex = currentQuestion.questionData?.correctAnswerIndex || 0
@@ -122,8 +122,9 @@ export function QuestionOverlay({
             ))}
           </div>
         )
+      }
 
-      case 'TRUE_FALSE':
+      case 'TRUE_FALSE': {
         const correctAnswer = currentQuestion.questionData?.correctAnswer
         
         return (
@@ -167,6 +168,7 @@ export function QuestionOverlay({
             ))}
           </div>
         )
+      }
 
       case 'SHORT_ANSWER':
         return (
@@ -231,7 +233,7 @@ export function QuestionOverlay({
           {/* Question */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              {currentQuestion.text || (currentQuestion as any).question}
+              {currentQuestion.text || (currentQuestion as unknown as {question: string}).question}
             </h3>
             {renderQuestionContent()}
           </div>

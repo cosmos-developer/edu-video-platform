@@ -229,7 +229,7 @@ export const videoService = {
     return response.data
   },
 
-  // Add video to group
+  // Add video to group (DEPRECATED - use uploadVideoFile for file uploads)
   async addVideoToGroup(groupId: string, data: {
     title: string
     description?: string
@@ -237,6 +237,22 @@ export const videoService = {
     duration?: number
     thumbnailUrl?: string
   }) {
+    // Note: This method is for URL-based videos, NOT file uploads
+    // Use uploadVideoFile() for actual file uploads to avoid "Video file is required" errors
+    
+    // Debug: Log the actual data being sent
+    console.warn('[VideoService] addVideoToGroup called with:', {
+      groupId,
+      data,
+      hasVideoUrl: !!data.videoUrl,
+      stack: new Error().stack
+    })
+    
+    // Validate videoUrl is present
+    if (!data.videoUrl) {
+      throw new Error('videoUrl is required for URL-based video uploads')
+    }
+    
     const response = await apiService.post<ApiResponse<Video>>(`/videos/groups/${groupId}/videos`, data)
     return response.data
   },
@@ -257,7 +273,7 @@ export const videoService = {
       `/videos/groups/${groupId}/videos`,
       formData,
       {
-        // Don't set Content-Type header - axios will set it with boundary
+        // Don't set Content-Type header - it will be handled by axios/interceptor for FormData
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)

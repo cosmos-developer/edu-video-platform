@@ -29,6 +29,7 @@ export function BaseLessonPage({ lessonId, children }: BaseLessonPageProps) {
     if (lessonId) {
       loadLesson()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId])
 
   const loadLesson = async () => {
@@ -46,8 +47,9 @@ export function BaseLessonPage({ lessonId, children }: BaseLessonPageProps) {
       if (firstVideo) {
         setSelectedVideo(firstVideo)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load lesson')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load lesson'
+      setError(message)
       console.error('Error loading lesson:', err)
     } finally {
       setLoading(false)
