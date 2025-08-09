@@ -19,7 +19,7 @@ export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated
   const [showAddForm, setShowAddForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [loadingQuestions] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [previewAnswer, setPreviewAnswer] = useState('')
 

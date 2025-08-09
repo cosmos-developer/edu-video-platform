@@ -19,13 +19,6 @@ export default function LessonsPage() {
     setError(null)
 
     try {
-      // Debug: Check if token exists
-      const token = localStorage.getItem('accessToken')
-      console.log('Token exists:', !!token)
-      if (token) {
-        console.log('Token preview:', token.substring(0, 50) + '...')
-      }
-
       const params: any = {
         page: 1,
         limit: 20,
@@ -38,12 +31,9 @@ export default function LessonsPage() {
       }
       
       const response = await lessonService.getLessons(params)
-      console.log('Lessons loaded successfully:', response)
-
       setLessons(response?.items || [])
     } catch (err: any) {
       console.error('Error loading lessons:', err)
-      console.error('Error response:', err.response)
       setError(err.message || 'Failed to load lessons')
       setLessons([]) // Ensure lessons is always an array
     } finally {
