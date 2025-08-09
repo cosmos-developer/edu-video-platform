@@ -67,6 +67,70 @@ npm run lint
 npm run typecheck
 ```
 
+## Frontend Development with Visual Debugging
+
+### Puppeteer-Based Screenshot Workflow
+
+The platform includes an integrated Puppeteer workflow for visual debugging and frontend development. This allows Claude Code to capture screenshots iteratively, identify visual issues, and debug frontend problems effectively.
+
+#### Screenshot Commands
+
+```bash
+# Capture full page screenshot
+npx tsx scripts/frontend/screenshot.ts capture http://localhost:3001
+
+# Capture specific element
+npx tsx scripts/frontend/screenshot.ts element '.video-player' http://localhost:3001
+
+# Capture multiple viewports (desktop, tablet, mobile)
+npx tsx scripts/frontend/screenshot.ts multi
+
+# Interactive debug mode with metrics
+npx tsx scripts/frontend/screenshot.ts debug http://localhost:3001
+
+# Test form interactions
+npx tsx scripts/frontend/screenshot.ts form http://localhost:3001/login
+```
+
+#### Frontend Debug Helper
+
+```bash
+# Quick frontend debugging
+./scripts/frontend/debug-frontend.sh capture     # Screenshot current state
+./scripts/frontend/debug-frontend.sh element '.error-message'  # Capture specific element
+./scripts/frontend/debug-frontend.sh responsive  # Test all viewports
+./scripts/frontend/debug-frontend.sh debug      # Full debug analysis
+```
+
+#### Visual Debugging Workflow
+
+When debugging frontend issues:
+
+1. **Initial State Capture**: Take a screenshot to see current visual state
+2. **Element Inspection**: Capture specific elements showing issues
+3. **Responsive Testing**: Verify layout across different screen sizes
+4. **Iterative Debugging**: Make changes, capture new screenshots, compare
+5. **Form Testing**: Fill forms programmatically and capture states
+
+#### Key Benefits
+
+- **Visual Verification**: See exactly what users see without manual inspection
+- **Cross-Device Testing**: Automatically test mobile, tablet, and desktop views
+- **Error Detection**: Capture error states and console logs
+- **Performance Metrics**: Get page load times and rendering metrics
+- **Automated Form Testing**: Test form submissions and validation states
+
+#### Integration with Development
+
+The screenshot tool automatically:
+- Creates a `screenshots/` directory for all captures
+- Names files with timestamps for easy tracking
+- Outputs file paths for Claude Code to read and analyze
+- Captures console logs and network errors
+- Supports custom viewports and wait conditions
+
+**Note**: Frontend runs on port 3001 by default (not 5173)
+
 ## Troubleshooting & Common Issues
 
 **📋 For recurring development issues, see:** [`docs/COMMON_ERRORS.md`](./docs/COMMON_ERRORS.md)

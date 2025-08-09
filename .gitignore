@@ -112,6 +112,10 @@ static/uploads/
 video-processing/
 temp-video/
 
+# Screenshots from Puppeteer debugging
+screenshots/
+*.screenshot.png
+
 # ===========================================
 # Testing
 # ===========================================
