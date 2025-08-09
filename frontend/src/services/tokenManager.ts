@@ -3,6 +3,8 @@
  * Handles all token operations including storage, validation, and refresh scheduling
  */
 
+import { debug } from '../utils/debug'
+
 interface JWTPayload {
   exp: number
   iat: number
@@ -35,7 +37,7 @@ class TokenManager {
       )
       return JSON.parse(jsonPayload)
     } catch (error) {
-      console.error('Failed to decode JWT:', error)
+      debug.error('Failed to decode JWT:', error)
       return null
     }
   }
@@ -48,7 +50,7 @@ class TokenManager {
       // Decode token to get expiry
       const payload = this.decodeJWT(accessToken)
       if (!payload) {
-        console.error('Invalid access token format')
+        debug.error('Invalid access token format')
         return false
       }
 
@@ -70,7 +72,7 @@ class TokenManager {
       
       return true
     } catch (error) {
-      console.error('Failed to store tokens:', error)
+      debug.error('Failed to store tokens:', error)
       return false
     }
   }
@@ -150,7 +152,7 @@ class TokenManager {
     const refreshTime = Math.max(0, timeUntilExpiry - 5 * 60 * 1000)
     
     this.refreshTimer = setTimeout(() => {
-      console.log('Auto-refreshing token...')
+      debug.auth('Auto-refreshing token')
       window.dispatchEvent(new CustomEvent('auth:token-refresh-needed'))
     }, refreshTime)
   }
@@ -230,7 +232,7 @@ class TokenManager {
         const tokens = await refreshFn()
         return this.setTokens(tokens.accessToken, tokens.refreshToken)
       } catch (error) {
-        console.error('Token refresh failed:', error)
+        debug.error('Token refresh failed:', error)
         return false
       } finally {
         this.refreshPromise = null

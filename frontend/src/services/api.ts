@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios'
 import TokenManager from './tokenManager'
+import { debug } from '../utils/debug'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'
 
@@ -42,7 +43,7 @@ class ApiService {
       async (config) => {
         // Check if token needs refresh before making request
         if (TokenManager.shouldRefreshToken() && !this.isRefreshing) {
-          console.log('Token needs refresh before request')
+          debug.auth('Token needs refresh before request')
           window.dispatchEvent(new CustomEvent('auth:token-refresh-needed'))
         }
 
@@ -66,9 +67,9 @@ class ApiService {
     this.api.interceptors.response.use(
       (response) => {
         // Log request duration in development
-        if (process.env.NODE_ENV === 'development' && (response.config as any).metadata) {
+        if ((response.config as any).metadata) {
           const duration = new Date().getTime() - (response.config as any).metadata.startTime.getTime()
-          console.log(`API ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`)
+          debug.api(response.config.method?.toUpperCase() || 'GET', response.config.url || '', duration)
         }
         
         return response
@@ -76,15 +77,13 @@ class ApiService {
       async (error: AxiosError) => {
         const originalRequest = error.config as any
         
-        // Log error details in development
-        if (process.env.NODE_ENV === 'development') {
-          console.error('API Error:', {
-            status: error.response?.status,
-            url: originalRequest?.url,
-            method: originalRequest?.method,
-            data: error.response?.data,
-          })
-        }
+        // Log error details
+        debug.error('API Error:', {
+          status: error.response?.status,
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          data: error.response?.data,
+        })
 
         // Handle 401 Unauthorized
         if (error.response?.status === 401 && originalRequest) {
@@ -157,7 +156,7 @@ class ApiService {
 
         // Handle network errors
         if (!error.response) {
-          console.error('Network error - no response received')
+          debug.error('Network error - no response received')
           error.message = 'Network error - please check your connection'
         }
 
@@ -248,7 +247,7 @@ class ApiService {
    */
   cancelAllRequests(message = 'Request cancelled') {
     // This would require implementing AbortController
-    console.log('Cancelling all requests:', message)
+    debug.log('Cancelling all requests:', message)
   }
 }
 

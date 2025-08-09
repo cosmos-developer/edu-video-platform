@@ -17,4 +17,6 @@ As AI keep overwriting working components, I need to understand which components
 
 1. Confirm affected components? ask why?
 2. Asking iteratively until a clear picture is provided
-3. Proceed with the plan
+3. Ensure alignment with reported architecture
+4. Proceed with the plan
+5. After code change, demand second check to ensure that non-relevant logic is not changed

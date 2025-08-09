@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer, useCallback, u
 import type { User, LoginCredentials, RegisterData } from '../types/auth'
 import { authService } from '../services/auth'
 import TokenManager from '../services/tokenManager'
+import { debug } from '../utils/debug'
 
 // Auth State
 interface AuthState {
@@ -120,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize auth on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('Initializing auth...')
+      debug.auth('Initializing')
       
       // Initialize token manager
       TokenManager.initialize()
@@ -130,18 +131,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const user = await authService.getCurrentUser()
           if (user) {
-            console.log('Session restored for user:', user.email)
+            debug.auth('Session restored', { email: user.email })
             dispatch({ type: 'RESTORE_SESSION', payload: user })
           } else {
-            console.log('Failed to restore session - clearing tokens')
+            debug.auth('Failed to restore session - clearing tokens')
             TokenManager.clearTokens()
           }
         } catch (error) {
-          console.error('Failed to restore session:', error)
+          debug.error('Failed to restore session:', error)
           TokenManager.clearTokens()
         }
       } else {
-        console.log('No valid token found')
+        debug.auth('No valid token found')
       }
       
       dispatch({ type: 'INITIALIZED' })
@@ -171,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: 'SESSION_EXPIRED' })
         }
       } catch (error) {
-        console.error('Token refresh failed:', error)
+        debug.error('Token refresh failed:', error)
         dispatch({ type: 'SESSION_EXPIRED' })
       } finally {
         refreshInProgress.current = false
@@ -192,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             dispatch({ type: 'RESTORE_SESSION', payload: user })
           }
         } catch (error) {
-          console.error('Failed to sync auth state:', error)
+          debug.error('Failed to sync auth state:', error)
         }
       }
     }
@@ -297,7 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SESSION_EXPIRED' })
       }
     } catch (error) {
-      console.error('Manual refresh failed:', error)
+      debug.error('Manual refresh failed:', error)
       dispatch({ type: 'REFRESH_ERROR' })
     } finally {
       refreshInProgress.current = false

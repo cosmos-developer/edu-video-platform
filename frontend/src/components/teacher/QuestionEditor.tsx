@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { questionService } from '../../services/video'
+import { debug } from '../../utils/debug'
 import type { Milestone } from '../../services/video'
 import { useVideoStateManager } from '../../contexts/VideoStateContext'
 import { useVideoState } from '../../hooks/useVideoState'
@@ -124,7 +125,7 @@ export function QuestionEditor({ milestone, videoId, onClose, onQuestionsUpdated
         onQuestionsUpdated()
       }
     } catch (err: any) {
-      console.error('Error adding question:', err)
+      debug.error('Error adding question:', err)
       setError(err.message || 'Failed to add question')
     } finally {
       setLoading(false)

@@ -1,6 +1,7 @@
 import { apiService } from './api'
 import TokenManager from './tokenManager'
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '../types/auth'
+import { debug } from '../utils/debug'
 
 class AuthService {
   /**
@@ -27,7 +28,7 @@ class AuthService {
       
       return response
     } catch (error: any) {
-      console.error('Login error:', error)
+      debug.error('Login error:', error)
       return {
         success: false,
         error: error.response?.data?.error || error.message || 'Login failed'
@@ -59,7 +60,7 @@ class AuthService {
       
       return response
     } catch (error: any) {
-      console.error('Registration error:', error)
+      debug.error('Registration error:', error)
       return {
         success: false,
         error: error.response?.data?.error || error.message || 'Registration failed'
@@ -74,14 +75,14 @@ class AuthService {
     try {
       // Check if we have a valid token first
       if (!TokenManager.isTokenValid()) {
-        console.log('No valid token, cannot get current user')
+        debug.auth('No valid token, cannot get current user')
         return null
       }
 
       const response = await apiService.get<{ success: boolean; data: User }>('/auth/me')
       return response.success ? response.data : null
     } catch (error: any) {
-      console.error('Failed to get current user:', error)
+      debug.error('Failed to get current user:', error)
       
       // If 401, token might be invalid
       if (error.response?.status === 401) {
@@ -99,7 +100,7 @@ class AuthService {
     try {
       const refreshToken = TokenManager.getRefreshToken()
       if (!refreshToken) {
-        console.log('No refresh token available')
+        debug.auth('No refresh token available')
         return false
       }
 
@@ -120,7 +121,7 @@ class AuthService {
         return response.data.tokens
       })
     } catch (error: any) {
-      console.error('Token refresh failed:', error)
+      debug.error('Token refresh failed:', error)
       
       // Clear tokens on refresh failure
       this.logout()

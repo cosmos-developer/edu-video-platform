@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Milestone } from '../../services/video'
+import { debug } from '../../utils/debug'
 
 interface QuestionOverlayProps {
   milestone: Milestone
@@ -44,7 +45,7 @@ export function QuestionOverlay({
       })
       setCompletedQuestions(prev => new Set(prev).add(currentQuestionIndex))
     } catch (error) {
-      console.error('Failed to submit answer:', error)
+      debug.error('Failed to submit answer:', error)
     } finally {
       setIsSubmitting(false)
     }

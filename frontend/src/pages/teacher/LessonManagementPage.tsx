@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { videoService } from '../../services/video'
 import { lessonService } from '../../services/lesson'
+import { debug } from '../../utils/debug'
 import type { VideoGroup, Video, Milestone } from '../../services/video'
 import type { Lesson } from '../../services/lesson'
 import { useAuth } from '../../hooks/useAuth'
@@ -35,7 +36,7 @@ function VideoUploadFormWrapper({ onVideoUploaded, onClose, getOrCreateVideoGrou
         const id = await getOrCreateVideoGroup()
         setGroupId(id)
       } catch (err: any) {
-        console.error('Error getting video group:', err)
+        debug.error('Error getting video group:', err)
         setError(err.message || 'Failed to initialize video group')
       } finally {
         setLoading(false)
@@ -153,7 +154,7 @@ export default function LessonManagementPage() {
         setVideoGroups((lessonData as any).videoGroups || [])
       }
     } catch (err: any) {
-      console.error('Error loading lesson:', err)
+      debug.error('Error loading lesson:', err)
       setError(err.message || 'Failed to load lesson')
     } finally {
       setLoading(false)
@@ -183,7 +184,7 @@ export default function LessonManagementPage() {
       })
       return videoGroup.id
     } catch (error) {
-      console.error('Error creating video group:', error)
+      debug.error('Error creating video group:', error)
       throw error
     }
   }
@@ -203,7 +204,7 @@ export default function LessonManagementPage() {
       // Load video into state manager
       await manager.loadVideo(video.id)
     } catch (error) {
-      console.error('Error loading video details:', error)
+      debug.error('Error loading video details:', error)
     }
   }
 

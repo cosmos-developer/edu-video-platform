@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { aiService } from '../../services/ai'
+import { debug } from '../../utils/debug'
 import type { GenerateQuestionsRequest, GeneratedQuestion } from '../../services/ai'
 import type { Video, Milestone, Question } from '../../services/video'
 import { useVideoStateManager } from '../../contexts/VideoStateContext'
@@ -53,7 +54,7 @@ export function AIQuestionGenerator({
         }))
       }
     } catch (error) {
-      console.error('Failed to load AI providers:', error)
+      debug.error('Failed to load AI providers:', error)
       setError('Failed to load AI configuration')
     }
   }
@@ -94,7 +95,7 @@ export function AIQuestionGenerator({
       setGeneratedQuestions(result.questions)
       setShowPreview(true)
     } catch (err: any) {
-      console.error('Error generating questions:', err)
+      debug.error('Error generating questions:', err)
       setError(err.message || 'Failed to generate questions')
     } finally {
       setLoading(false)
@@ -124,7 +125,7 @@ export function AIQuestionGenerator({
 
       onQuestionsGenerated()
     } catch (err: any) {
-      console.error('Error applying questions:', err)
+      debug.error('Error applying questions:', err)
       setError(err.message || 'Failed to apply questions')
     } finally {
       setLoading(false)

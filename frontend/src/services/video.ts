@@ -1,4 +1,5 @@
 import { apiService } from './api'
+import { debug } from '../utils/debug'
 
 // Standard API response wrapper
 export interface ApiResponse<T> {
@@ -497,7 +498,7 @@ export const sessionService = {
       const response = await apiService.get<ApiResponse<VideoSession | null>>(`/sessions/video/${videoId}`)
       return response.data
     } catch (error) {
-      console.log('No existing session for video:', videoId)
+      debug.video('No existing session for video', { videoId })
       return null
     }
   },
